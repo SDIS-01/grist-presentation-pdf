@@ -28,26 +28,8 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
 }
 #toolbar button:hover{background:#001c73;}
 #toolbar button:disabled{background:#aaa;cursor:default;}
-#configBtn{
-    min-height:34px;padding:6px 12px;font-size:12px;border:1px solid #ccc;
-    background:#fff;border-radius:4px;cursor:pointer;
-}
 #status{font-size:12px;color:#666;}
 
-#configPanel{
-    display:none;position:absolute;top:54px;right:14px;z-index:50;
-    background:#fff;border:1px solid #ccc;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.18);
-    padding:16px;width:420px;max-width:90vw;
-}
-#configPanel h3{margin:0 0 8px 0;font-size:14px;}
-#configPanel label{display:block;font-size:12px;color:#555;margin-bottom:4px;margin-top:10px;}
-#configPanel input[type=text],#configPanel textarea{
-    width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;
-}
-#configPanel .config-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
-#configPanel button{padding:6px 14px;font-size:12px;border-radius:4px;cursor:pointer;}
-#saveConfig{background:#2e7d32;color:#fff;border:none;}
-#cancelConfig{background:none;border:1px solid #ccc;}
 
 #pagesContainer{padding:20px;display:flex;flex-direction:column;align-items:center;gap:24px;}
 .pdf-page{
@@ -115,23 +97,13 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
   <input type="text" id="projectSelect" list="projectOptions" placeholder="Choisir un projet… (tapez pour rechercher)" autocomplete="off" style="min-height:34px;padding:4px 8px;font-size:13px;flex:1 1 320px;max-width:520px;border:1px solid #ccc;border-radius:4px;">
   <datalist id="projectOptions"></datalist>
   <button id="generateBtn">Télécharger le PDF</button>
-  <button id="configBtn" type="button">⚙ Configuration</button>
+  <button id="resetBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;">↺ Réinitialiser</button>
   <span id="status"></span>
 </div>
 
 <div id="extraCommentBar" style="padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;">
   <label for="extraCommentInput" style="display:block;font-size:12px;color:#555;margin-bottom:4px;">Commentaire additionnel (imprimé sur le PDF, non enregistré dans Grist)</label>
   <textarea id="extraCommentInput" rows="3" style="width:100%;max-width:700px;box-sizing:border-box;padding:6px 8px;font-size:12px;font-family:Tahoma,Geneva,sans-serif;border:1px solid #ccc;border-radius:4px;resize:vertical;" placeholder="Écrire un commentaire à inclure dans ce PDF…"></textarea>
-</div>
-
-<div id="configPanel">
-  <h3>Configuration du récap</h3>
-  <label>Texte de pied de page (la date du jour est ajoutée automatiquement)</label>
-  <input type="text" id="footerTextInput" placeholder="SDIS de l'Ain _ Version">
-  <div class="config-footer">
-    <button id="cancelConfig" type="button">Fermer</button>
-    <button id="saveConfig" type="button">Enregistrer</button>
-  </div>
 </div>
 
 <div id="pagesContainer"></div>
@@ -155,8 +127,7 @@ columns:[
 {name:'journalBord',title:'Journal_bord', optional:true},
 {name:'groupement',title:'Groupement', optional:true},
 {name:'passageInstance',title:'Passage_Instance_Concatener', optional:true}
-],
-onEditOptions: ()=> openConfigPanel()
+]
 })
 
 let currentRecords = []
@@ -172,17 +143,10 @@ function footerWithDate(){
     return `${footerText} ${dateStr}`
 }
 
-const configPanel = document.getElementById("configPanel")
-function openConfigPanel(){
-    document.getElementById("footerTextInput").value = footerText
-    configPanel.style.display = "block"
-}
-document.getElementById("configBtn").onclick = openConfigPanel
-document.getElementById("cancelConfig").onclick = ()=> configPanel.style.display = "none"
-document.getElementById("saveConfig").onclick = ()=>{
-    footerText = document.getElementById("footerTextInput").value.trim() || footerText
-    grist.setOption("footerText", footerText)
-    configPanel.style.display = "none"
+document.getElementById("resetBtn").onclick = ()=>{
+    projectSelect.value = ""
+    document.getElementById("extraCommentInput").value = ""
+    document.getElementById("status").textContent = ""
     renderPages()
 }
 
@@ -421,17 +385,25 @@ function buildGanttHtml(actionRows, m, numMap){
 
     let allDates = []
     dated.forEach(x=>{ if(x.start) allDates.push(x.start); if(x.end) allDates.push(x.end) })
-    let min = new Date(Math.min(...allDates))
-    let max = new Date(Math.max(...allDates))
-    if(min.getTime() === max.getTime()) max = new Date(min.getTime() + 86400000*30)
+    let minDate = new Date(Math.min(...allDates))
+    let maxDate = new Date(Math.max(...allDates))
 
-    let totalSpan = max - min
-    let unitsCount = 4
-    let unitLabels = []
-    for(let i=0;i<unitsCount;i++){
-        let d = new Date(min.getTime() + (totalSpan * i / unitsCount))
-        unitLabels.push(d.toLocaleDateString("fr-FR", {month:"short", year:"2-digit"}))
+    // Construit la liste des trimestres calendaires (T1..T4) couvrant la periode min-max
+    let quarters = []
+    let qYear = minDate.getFullYear()
+    let qIndex = Math.floor(minDate.getMonth()/3)
+    while(true){
+        let qStart = new Date(qYear, qIndex*3, 1)
+        let qEnd = new Date(qYear, qIndex*3+3, 1)
+        quarters.push({start:qStart, end:qEnd, label:`T${qIndex+1} ${qYear}`})
+        if(qEnd > maxDate) break
+        qIndex++
+        if(qIndex > 3){ qIndex = 0; qYear++ }
     }
+
+    let min = quarters[0].start
+    let max = quarters[quarters.length-1].end
+    let totalSpan = max - min
 
     let rows = dated.slice(0, 8).map(x=>{
         let s = x.start || min
@@ -458,7 +430,7 @@ function buildGanttHtml(actionRows, m, numMap){
       <div style="margin-bottom:16px;">
         <div class="gantt-header">
           <div class="name-col"></div>
-          ${unitLabels.map(l=>`<div class="unit">${l}</div>`).join("")}
+          ${quarters.map(q=>`<div class="unit">${q.label}</div>`).join("")}
         </div>
         ${rows}
       </div>`
