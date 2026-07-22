@@ -10,6 +10,7 @@
 :root{
     --green:#9BBB59; --green-pale:#EDF3DF; --green-text:#5E7A34;
     --yellow:#FFCC00; --yellow-pale:#FFF6D6; --yellow-text:#8C6D00;
+    --purple:#8064A2; --purple-pale:#E9E2F0; --purple-text:#4E3A72;
     --orange:#F79646; --orange-pale:#FDEEE1; --orange-text:#B35D15;
     --red:#C0504D; --red-pale:#F6E1E0; --red-text:#8C3A38;
     --gray:#808080; --gray-pale:#ECECEC; --gray-text:#4D4D4D;
@@ -95,10 +96,10 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
 .instance-box{font-size:11px;line-height:1.7;white-space:pre-wrap;}
 
 .gantt-header{display:flex;font-size:9.5px;color:#5f5e5a;border-bottom:1px solid #eee;padding-bottom:3px;margin-bottom:5px;}
-.gantt-header .name-col{width:150px;flex:0 0 auto;}
+.gantt-header .name-col{width:34px;flex:0 0 auto;}
 .gantt-header .unit{flex:1;text-align:center;}
 .gantt-row{display:flex;align-items:center;height:22px;margin-bottom:3px;}
-.gantt-row .name-col{width:150px;flex:0 0 auto;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:6px;}
+.gantt-row .name-col{width:34px;flex:0 0 auto;font-size:11px;font-weight:700;color:#5f5e5a;text-align:center;}
 .gantt-track{flex:1;position:relative;height:100%;}
 .gantt-bar-bg{position:absolute;top:4px;height:14px;border-radius:3px;overflow:hidden;}
 .gantt-bar-fill{position:absolute;top:0;left:0;bottom:0;}
@@ -125,8 +126,8 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
   <h3>Configuration du récap</h3>
   <label>Image d'en-tête (URL, ou image encodée en base64 data:image/...)</label>
   <textarea id="headerImageInput" rows="3" placeholder="https://... ou data:image/png;base64,..."></textarea>
-  <label>Nom du service affiché en pied de page</label>
-  <input type="text" id="footerTextInput" placeholder="SDIS de l'Ain — Document généré depuis Grist">
+  <label>Texte de pied de page (la date du jour est ajoutée automatiquement)</label>
+  <input type="text" id="footerTextInput" placeholder="SDIS de l'Ain _ Version">
   <div class="config-footer">
     <button id="cancelConfig" type="button">Fermer</button>
     <button id="saveConfig" type="button">Enregistrer</button>
@@ -160,7 +161,15 @@ onEditOptions: ()=> openConfigPanel()
 let currentRecords = []
 let currentMappings = {}
 let headerImageUrl = ""
-let footerText = "SDIS de l'Ain — Document généré depuis Grist"
+let footerText = "SDIS de l'Ain _ Version"
+
+function footerWithDate(){
+    let d = new Date()
+    let day = String(d.getDate()).padStart(2,'0')
+    let month = String(d.getMonth()+1).padStart(2,'0')
+    let dateStr = `${day}/${month}/${d.getFullYear()}`
+    return `${footerText} ${dateStr}`
+}
 
 const configPanel = document.getElementById("configPanel")
 function openConfigPanel(){
@@ -228,10 +237,14 @@ function isInterrompu(r, m){
 }
 
 // Retourne le jeu de couleurs (fond clair / couleur pleine / texte fonce) pour un pourcentage donne
-function bandColors(pct, interrompu){
+function bandColors(pct, interrompu, useGlobalPalette){
     if(interrompu) return {fill:"var(--gray)", pale:"var(--gray-pale)", text:"var(--gray-text)"}
     if(pct >= 100) return {fill:"var(--green)", pale:"var(--green-pale)", text:"var(--green-text)"}
-    if(pct >= 50) return {fill:"var(--yellow)", pale:"var(--yellow-pale)", text:"var(--yellow-text)"}
+    if(pct >= 50){
+        return useGlobalPalette
+            ? {fill:"var(--purple)", pale:"var(--purple-pale)", text:"var(--purple-text)"}
+            : {fill:"var(--yellow)", pale:"var(--yellow-pale)", text:"var(--yellow-text)"}
+    }
     if(pct >= 1) return {fill:"var(--orange)", pale:"var(--orange-pale)", text:"var(--orange-text)"}
     return {fill:"var(--red)", pale:"var(--red-pale)", text:"var(--red-text)"}
 }
@@ -323,7 +336,7 @@ function buildPage1(projectRow, actionRows, m){
     let passageInstance = projectRow ? displayValue(projectRow[m.passageInstance]) : ""
     let avancementGlobal = projectRow ? getPercent(projectRow[m.avancement]) : 0
     let projInterrompu = projectRow ? isInterrompu(projectRow, m) : false
-    let donutColors = bandColors(avancementGlobal, projInterrompu)
+    let donutColors = bandColors(avancementGlobal, projInterrompu, true)
 
     page.innerHTML = `
       <div class="page-header">${headerHtml()}</div>
@@ -350,13 +363,13 @@ function buildPage1(projectRow, actionRows, m){
           </div>
           <div class="right-col">
             <div class="section-title">Planning</div>
-            ${buildGanttHtml(actionRows, m)}
+            ${buildGanttHtml(actionRows, m, actionNumbers(actionRows))}
             <div class="section-title">Actions</div>
-            ${buildActionsTableHtml(actionRows, m)}
+            ${buildActionsTableHtml(actionRows, m, actionNumbers(actionRows))}
           </div>
         </div>
       </div>
-      <div class="page-footer">${escapeHtml(footerText)}</div>
+      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
     `
     return page
 }
@@ -375,18 +388,10 @@ function buildPage2(projectRow, m){
           <div class="proj-title">${escapeHtml(title)}</div>
           <div class="page-num">Page 2/2</div>
         </div>
-        <div class="body-flex">
-          <div class="left-col">
-            <div class="section-title" style="color:#b4b2a9;">Budget</div>
-            <div class="budget-placeholder">à venir</div>
-          </div>
-          <div class="right-col">
-            <div class="section-title">Journal de bord</div>
-            ${journal ? journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("") : `<div class="budget-placeholder">Aucune entrée</div>`}
-          </div>
-        </div>
+        <div class="section-title">Journal de bord</div>
+        ${journal ? journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("") : `<div style="font-size:11px;color:#999;">Aucune entrée</div>`}
       </div>
-      <div class="page-footer">${escapeHtml(footerText)}</div>
+      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
     `
     return page
 }
@@ -396,7 +401,13 @@ function selectedIdFallback(){
 }
 
 // ===== Mini planning (Gantt) =====
-function buildGanttHtml(actionRows, m){
+function actionNumbers(actionRows){
+    let map = new Map()
+    actionRows.forEach((r, i) => map.set(r.id, i+1))
+    return map
+}
+
+function buildGanttHtml(actionRows, m, numMap){
     let dated = actionRows
         .map(r => ({r, start:parseDate(r[m.dateDebut]), end:parseDate(r[m.dateFin])}))
         .filter(x => x.start || x.end)
@@ -428,9 +439,10 @@ function buildGanttHtml(actionRows, m){
         let interrompu = isInterrompu(x.r, m)
         let colors = bandColors(pct, interrompu)
         let name = displayValue(x.r[m.idAction]) || displayValue(x.r[m.idProjet])
+        let num = numMap.get(x.r.id)
         return `
           <div class="gantt-row">
-            <div class="name-col" title="${escapeAttr(name)}">${escapeHtml(name)}</div>
+            <div class="name-col" title="${escapeAttr(name)}">${num}</div>
             <div class="gantt-track">
               <div class="gantt-bar-bg" style="left:${leftPct}%;width:${widthPct}%;background:${colors.pale};">
                 <div class="gantt-bar-fill" style="width:${pct}%;background:${colors.fill};"></div>
@@ -449,7 +461,7 @@ function buildGanttHtml(actionRows, m){
       </div>`
 }
 
-function buildActionsTableHtml(actionRows, m){
+function buildActionsTableHtml(actionRows, m, numMap){
     if(actionRows.length === 0){
         return `<div style="font-size:11px;color:#999;">Aucune action associée à ce projet.</div>`
     }
@@ -460,7 +472,9 @@ function buildActionsTableHtml(actionRows, m){
         let interrompu = isInterrompu(r, m)
         let colors = bandColors(pct, interrompu)
         let label = interrompu ? "Interrompu" : `${pct}%`
+        let num = numMap.get(r.id)
         return `<tr>
+            <td>${num}</td>
             <td>${escapeHtml(name)}</td>
             <td>${escapeHtml(porteur)}</td>
             <td><span class="pct-badge" style="background:${colors.pale};color:${colors.text};">${label}</span></td>
@@ -468,7 +482,7 @@ function buildActionsTableHtml(actionRows, m){
     }).join("")
     return `
       <table class="actions-table">
-        <tr><th>Action</th><th>Porteur</th><th>Avancement</th></tr>
+        <tr><th>#</th><th>Action</th><th>Porteur</th><th>Avancement</th></tr>
         ${rows}
       </table>`
 }
