@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+    --green:#9BBB59; --green-pale:#EDF3DF; --green-text:#5E7A34;
+    --yellow:#FFCC00; --yellow-pale:#FFF6D6; --yellow-text:#8C6D00;
+    --orange:#F79646; --orange-pale:#FDEEE1; --orange-text:#B35D15;
+    --red:#C0504D; --red-pale:#F6E1E0; --red-text:#8C3A38;
+    --gray:#808080; --gray-pale:#ECECEC; --gray-text:#4D4D4D;
+    --bleu-france:#002395;
+}
+body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
+#toolbar{
+    padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+#toolbar select{min-height:34px;padding:4px 8px;font-size:13px;flex:1 1 260px;max-width:480px;}
+#toolbar button{
+    min-height:34px;padding:6px 16px;font-size:13px;font-weight:700;
+    border:none;border-radius:4px;background:var(--bleu-france);color:#fff;cursor:pointer;
+}
+#toolbar button:hover{background:#001c73;}
+#toolbar button:disabled{background:#aaa;cursor:default;}
+#configBtn{
+    min-height:34px;padding:6px 12px;font-size:12px;border:1px solid #ccc;
+    background:#fff;border-radius:4px;cursor:pointer;
+}
+#status{font-size:12px;color:#666;}
+
+#configPanel{
+    display:none;position:absolute;top:54px;right:14px;z-index:50;
+    background:#fff;border:1px solid #ccc;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.18);
+    padding:16px;width:420px;max-width:90vw;
+}
+#configPanel h3{margin:0 0 8px 0;font-size:14px;}
+#configPanel label{display:block;font-size:12px;color:#555;margin-bottom:4px;margin-top:10px;}
+#configPanel input[type=text],#configPanel textarea{
+    width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;
+}
+#configPanel .config-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+#configPanel button{padding:6px 14px;font-size:12px;border-radius:4px;cursor:pointer;}
+#saveConfig{background:#2e7d32;color:#fff;border:none;}
+#cancelConfig{background:none;border:1px solid #ccc;}
+
+#pagesContainer{padding:20px;display:flex;flex-direction:column;align-items:center;gap:24px;}
+.pdf-page{
+    width:1123px;height:794px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);
+    color:#1a1a1a;display:flex;flex-direction:column;overflow:hidden;flex:0 0 auto;
+}
+.page-header{display:flex;align-items:center;gap:14px;padding:14px 28px;background:#f4f2ee;flex:0 0 auto;}
+.page-header img{height:44px;display:block;}
+.page-header .header-placeholder{
+    flex:1;height:44px;background:#e9e6df;border-radius:4px;display:flex;align-items:center;
+    padding-left:14px;font-size:11px;color:#a8a59c;
+}
+.page-body{padding:20px 30px;flex:1;overflow:hidden;}
+.page-footer{padding:8px 30px;border-top:1px solid #eee;font-size:10px;color:#888780;flex:0 0 auto;}
+
+.proj-title-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;}
+.proj-title{font-size:19px;font-weight:700;color:var(--bleu-france);max-width:820px;}
+.page-num{font-size:10px;color:#5f5e5a;white-space:nowrap;}
+
+.left-col{width:250px;flex:0 0 auto;}
+.right-col{flex:1;min-width:0;}
+.body-flex{display:flex;gap:24px;height:100%;}
+
+.donut-row{display:flex;gap:12px;align-items:center;margin-bottom:14px;}
+.donut{
+    position:relative;width:88px;height:88px;flex:0 0 auto;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+}
+.donut-inner{
+    width:64px;height:64px;border-radius:50%;background:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#1a1a1a;
+}
+.donut-label{font-size:12px;color:#5f5e5a;}
+
+.badge-list{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;}
+.badge-item{background:#eef2f8;border-radius:6px;padding:7px 11px;font-size:12px;}
+.badge-item .k{color:#5f5e5a;}
+.badge-item .v{font-weight:700;color:var(--bleu-france);}
+
+.section-title{font-size:12px;font-weight:700;margin-bottom:6px;color:var(--bleu-france);}
+.comment-box{
+    font-size:11px;color:#333;background:#fafaf8;border-radius:6px;padding:9px 11px;
+    line-height:1.45;margin-bottom:14px;border-left:3px solid var(--bleu-france);
+    white-space:pre-wrap;
+}
+.instance-box{font-size:11px;line-height:1.7;white-space:pre-wrap;}
+
+.gantt-header{display:flex;font-size:9.5px;color:#5f5e5a;border-bottom:1px solid #eee;padding-bottom:3px;margin-bottom:5px;}
+.gantt-header .name-col{width:150px;flex:0 0 auto;}
+.gantt-header .unit{flex:1;text-align:center;}
+.gantt-row{display:flex;align-items:center;height:22px;margin-bottom:3px;}
+.gantt-row .name-col{width:150px;flex:0 0 auto;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:6px;}
+.gantt-track{flex:1;position:relative;height:100%;}
+.gantt-bar-bg{position:absolute;top:4px;height:14px;border-radius:3px;overflow:hidden;}
+.gantt-bar-fill{position:absolute;top:0;left:0;bottom:0;}
+
+table.actions-table{width:100%;border-collapse:collapse;font-size:11px;}
+table.actions-table th{padding:5px 4px;color:#5f5e5a;font-weight:700;text-align:left;border-bottom:1px solid #b9c6dc;}
+table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
+.pct-badge{padding:2px 10px;border-radius:8px;font-weight:700;display:inline-block;}
+
+.journal-entry{margin-bottom:9px;font-size:11.5px;line-height:1.7;}
+.budget-placeholder{font-size:11px;color:#b4b2a9;font-style:italic;}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <select id="projectSelect"><option value="">Choisir un projet…</option></select>
+  <button id="generateBtn">Télécharger le PDF</button>
+  <button id="configBtn" type="button">⚙ Configuration</button>
+  <span id="status"></span>
+</div>
+
+<div id="configPanel">
+  <h3>Configuration du récap</h3>
+  <label>Image d'en-tête (URL, ou image encodée en base64 data:image/...)</label>
+  <textarea id="headerImageInput" rows="3" placeholder="https://... ou data:image/png;base64,..."></textarea>
+  <label>Nom du service affiché en pied de page</label>
+  <input type="text" id="footerTextInput" placeholder="SDIS de l'Ain — Document généré depuis Grist">
+  <div class="config-footer">
+    <button id="cancelConfig" type="button">Fermer</button>
+    <button id="saveConfig" type="button">Enregistrer</button>
+  </div>
+</div>
+
+<div id="pagesContainer"></div>
+
+<script>
+grist.ready({
+requiredAccess:'read table',
+columns:[
+{name:'idProjet',title:'ID_Projet_Action_AV'},
+{name:'idAction',title:'ID_Action_MEO'},
+{name:'nature',title:'Nature'},
+{name:'dateDebut',title:'Date_Début', optional:true},
+{name:'dateFin',title:'Date_Fin', optional:true},
+{name:'dateSuspension',title:'Date_Suspension', optional:true},
+{name:'dateAbandon',title:'Date_Abandon', optional:true},
+{name:'avancement',title:'Avancement', optional:true},
+{name:'porteur',title:'Porteur', optional:true},
+{name:'priorite',title:'Priorité', optional:true},
+{name:'commentaire',title:'Commentaire', optional:true},
+{name:'journalBord',title:'Journal_bord', optional:true},
+{name:'groupement',title:'Groupement', optional:true},
+{name:'passageInstance',title:'Passage_Instance_Concatener', optional:true}
+],
+onEditOptions: ()=> openConfigPanel()
+})
+
+let currentRecords = []
+let currentMappings = {}
+let headerImageUrl = ""
+let footerText = "SDIS de l'Ain — Document généré depuis Grist"
+
+const configPanel = document.getElementById("configPanel")
+function openConfigPanel(){
+    document.getElementById("headerImageInput").value = headerImageUrl
+    document.getElementById("footerTextInput").value = footerText
+    configPanel.style.display = "block"
+}
+document.getElementById("configBtn").onclick = openConfigPanel
+document.getElementById("cancelConfig").onclick = ()=> configPanel.style.display = "none"
+document.getElementById("saveConfig").onclick = ()=>{
+    headerImageUrl = document.getElementById("headerImageInput").value.trim()
+    footerText = document.getElementById("footerTextInput").value.trim() || footerText
+    grist.setOption("headerImageUrl", headerImageUrl)
+    grist.setOption("footerText", footerText)
+    configPanel.style.display = "none"
+    renderPages()
+}
+
+grist.onOptions((options)=>{
+    if(options){
+        if(typeof options.headerImageUrl === "string") headerImageUrl = options.headerImageUrl
+        if(typeof options.footerText === "string" && options.footerText) footerText = options.footerText
+    }
+    renderPages()
+})
+
+function parseDate(v){
+    if(!v) return null
+    if(typeof v==="number"){ if(v<10000000000)v*=1000; return new Date(v) }
+    let d = new Date(v)
+    return isNaN(d)?null:d
+}
+
+function formatDateFr(v){
+    let d = parseDate(v)
+    if(!d) return ""
+    let day = String(d.getDate()).padStart(2,'0')
+    let month = String(d.getMonth()+1).padStart(2,'0')
+    return `${day}/${month}/${d.getFullYear()}`
+}
+
+function displayValue(v){
+    if(v===null || v===undefined) return ""
+    if(Array.isArray(v)){
+        let arr = v[0]==='L' ? v.slice(1) : v
+        return arr.map(displayValue).join(", ")
+    }
+    if(typeof v === "object"){
+        if('value' in v) return displayValue(v.value)
+        return ""
+    }
+    return String(v)
+}
+
+function getPercent(v){
+    if(v===null || v===undefined || v==="") return 0
+    let n = Number(v)
+    if(isNaN(n)) return 0
+    if(n<=1) n = n*100
+    return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+function isInterrompu(r, m){
+    return !!(parseDate(r[m.dateSuspension]) || parseDate(r[m.dateAbandon]))
+}
+
+// Retourne le jeu de couleurs (fond clair / couleur pleine / texte fonce) pour un pourcentage donne
+function bandColors(pct, interrompu){
+    if(interrompu) return {fill:"var(--gray)", pale:"var(--gray-pale)", text:"var(--gray-text)"}
+    if(pct >= 100) return {fill:"var(--green)", pale:"var(--green-pale)", text:"var(--green-text)"}
+    if(pct >= 50) return {fill:"var(--yellow)", pale:"var(--yellow-pale)", text:"var(--yellow-text)"}
+    if(pct >= 1) return {fill:"var(--orange)", pale:"var(--orange-pale)", text:"var(--orange-text)"}
+    return {fill:"var(--red)", pale:"var(--red-pale)", text:"var(--red-text)"}
+}
+
+function priorityColor(label){
+    let s = (label||"").toLowerCase()
+    if(s.startsWith("p1")) return "var(--red-text)"
+    if(s.startsWith("p2")) return "var(--orange-text)"
+    if(s.startsWith("p3")) return "var(--yellow-text)"
+    if(s.startsWith("interrompu")) return "var(--gray-text)"
+    if(s.startsWith("termin")) return "var(--green-text)"
+    return "var(--bleu-france)"
+}
+
+function escapeHtml(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+}
+
+// ===== Selection du projet =====
+const projectSelect = document.getElementById("projectSelect")
+
+function isProjectRow(r, m){
+    let n = displayValue(r[m.nature]).trim().toLowerCase()
+    return n === "av" || n === "peps"
+}
+
+function refreshProjectList(){
+    let m = currentMappings
+    if(!m.idProjet || !m.nature) return
+    let projects = currentRecords
+        .filter(r => isProjectRow(r, m))
+        .map(r => displayValue(r[m.idProjet]))
+        .filter(v => v !== "")
+    projects = [...new Set(projects)].sort((a,b)=>a.localeCompare(b,'fr',{sensitivity:'base'}))
+
+    let previousValue = projectSelect.value
+    projectSelect.innerHTML = `<option value="">Choisir un projet…</option>` +
+        projects.map(p => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join("")
+    if(projects.includes(previousValue)) projectSelect.value = previousValue
+}
+
+function escapeAttr(s){
+    return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;")
+}
+
+projectSelect.onchange = renderPages
+
+// ===== Rendu des pages =====
+function renderPages(){
+    let container = document.getElementById("pagesContainer")
+    let m = currentMappings
+    refreshProjectList()
+
+    let selectedId = projectSelect.value
+    if(!selectedId || !m.idProjet){
+        container.innerHTML = `<div style="color:#888;font-size:13px;padding:40px;">Sélectionnez un projet ci-dessus pour afficher son récapitulatif.</div>`
+        document.getElementById("generateBtn").disabled = true
+        return
+    }
+    document.getElementById("generateBtn").disabled = false
+
+    let projectRow = currentRecords.find(r => isProjectRow(r, m) && displayValue(r[m.idProjet]) === selectedId)
+    let actionRows = currentRecords.filter(r =>
+        !isProjectRow(r, m) &&
+        displayValue(r[m.idProjet]) === selectedId
+    )
+
+    container.innerHTML = ""
+    container.appendChild(buildPage1(projectRow, actionRows, m))
+    container.appendChild(buildPage2(projectRow, m))
+}
+
+function headerHtml(){
+    if(headerImageUrl){
+        return `<img src="${escapeAttr(headerImageUrl)}" alt="">`
+    }
+    return `<div class="header-placeholder">bandeau d'en-tête non configuré (⚙ Configuration)</div>`
+}
+
+function buildPage1(projectRow, actionRows, m){
+    let page = document.createElement("div")
+    page.className = "pdf-page"
+
+    let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
+    let groupement = projectRow ? displayValue(projectRow[m.groupement]) : ""
+    let porteur = projectRow ? displayValue(projectRow[m.porteur]) : ""
+    let priorite = projectRow ? displayValue(projectRow[m.priorite]) : ""
+    let commentaire = projectRow ? displayValue(projectRow[m.commentaire]) : ""
+    let passageInstance = projectRow ? displayValue(projectRow[m.passageInstance]) : ""
+    let avancementGlobal = projectRow ? getPercent(projectRow[m.avancement]) : 0
+    let projInterrompu = projectRow ? isInterrompu(projectRow, m) : false
+    let donutColors = bandColors(avancementGlobal, projInterrompu)
+
+    page.innerHTML = `
+      <div class="page-header">${headerHtml()}</div>
+      <div class="page-body">
+        <div class="proj-title-row">
+          <div class="proj-title">${escapeHtml(title)}</div>
+          <div class="page-num">Page 1/2</div>
+        </div>
+        <div class="body-flex">
+          <div class="left-col">
+            <div class="donut-row">
+              <div class="donut" style="background:conic-gradient(${donutColors.fill} 0% ${avancementGlobal}%, #e6e6e6 ${avancementGlobal}% 100%);">
+                <div class="donut-inner">${avancementGlobal}%</div>
+              </div>
+              <div class="donut-label">Avancement<br>global</div>
+            </div>
+            <div class="badge-list">
+              ${groupement ? `<div class="badge-item"><span class="k">Groupement</span> <span class="v">${escapeHtml(groupement)}</span></div>` : ``}
+              ${porteur ? `<div class="badge-item"><span class="k">Porteur</span> <span class="v">${escapeHtml(porteur)}</span></div>` : ``}
+              ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="v" style="color:${priorityColor(priorite)};">${escapeHtml(priorite)}</span></div>` : ``}
+            </div>
+            ${commentaire ? `<div class="section-title">Commentaire</div><div class="comment-box">${escapeHtml(commentaire)}</div>` : ``}
+            ${passageInstance ? `<div class="section-title">Passages en instance</div><div class="instance-box">${escapeHtml(passageInstance)}</div>` : ``}
+          </div>
+          <div class="right-col">
+            <div class="section-title">Planning</div>
+            ${buildGanttHtml(actionRows, m)}
+            <div class="section-title">Actions</div>
+            ${buildActionsTableHtml(actionRows, m)}
+          </div>
+        </div>
+      </div>
+      <div class="page-footer">${escapeHtml(footerText)}</div>
+    `
+    return page
+}
+
+function buildPage2(projectRow, m){
+    let page = document.createElement("div")
+    page.className = "pdf-page"
+
+    let journal = projectRow ? displayValue(projectRow[m.journalBord]) : ""
+    let title = projectRow ? displayValue(projectRow[m.idProjet]) : ""
+
+    page.innerHTML = `
+      <div class="page-header">${headerHtml()}</div>
+      <div class="page-body">
+        <div class="proj-title-row">
+          <div class="proj-title">${escapeHtml(title)}</div>
+          <div class="page-num">Page 2/2</div>
+        </div>
+        <div class="body-flex">
+          <div class="left-col">
+            <div class="section-title" style="color:#b4b2a9;">Budget</div>
+            <div class="budget-placeholder">à venir</div>
+          </div>
+          <div class="right-col">
+            <div class="section-title">Journal de bord</div>
+            ${journal ? journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("") : `<div class="budget-placeholder">Aucune entrée</div>`}
+          </div>
+        </div>
+      </div>
+      <div class="page-footer">${escapeHtml(footerText)}</div>
+    `
+    return page
+}
+
+function selectedIdFallback(){
+    return projectSelect.value || ""
+}
+
+// ===== Mini planning (Gantt) =====
+function buildGanttHtml(actionRows, m){
+    let dated = actionRows
+        .map(r => ({r, start:parseDate(r[m.dateDebut]), end:parseDate(r[m.dateFin])}))
+        .filter(x => x.start || x.end)
+
+    if(dated.length === 0){
+        return `<div style="font-size:11px;color:#999;margin-bottom:14px;">Aucune date renseignée sur les actions.</div>`
+    }
+
+    let allDates = []
+    dated.forEach(x=>{ if(x.start) allDates.push(x.start); if(x.end) allDates.push(x.end) })
+    let min = new Date(Math.min(...allDates))
+    let max = new Date(Math.max(...allDates))
+    if(min.getTime() === max.getTime()) max = new Date(min.getTime() + 86400000*30)
+
+    let totalSpan = max - min
+    let unitsCount = 4
+    let unitLabels = []
+    for(let i=0;i<unitsCount;i++){
+        let d = new Date(min.getTime() + (totalSpan * i / unitsCount))
+        unitLabels.push(d.toLocaleDateString("fr-FR", {month:"short", year:"2-digit"}))
+    }
+
+    let rows = dated.slice(0, 8).map(x=>{
+        let s = x.start || min
+        let e = x.end || max
+        let leftPct = Math.max(0, Math.min(100, ((s-min)/totalSpan)*100))
+        let widthPct = Math.max(1.5, Math.min(100-leftPct, ((e-s)/totalSpan)*100))
+        let pct = getPercent(x.r[m.avancement])
+        let interrompu = isInterrompu(x.r, m)
+        let colors = bandColors(pct, interrompu)
+        let name = displayValue(x.r[m.idAction]) || displayValue(x.r[m.idProjet])
+        return `
+          <div class="gantt-row">
+            <div class="name-col" title="${escapeAttr(name)}">${escapeHtml(name)}</div>
+            <div class="gantt-track">
+              <div class="gantt-bar-bg" style="left:${leftPct}%;width:${widthPct}%;background:${colors.pale};">
+                <div class="gantt-bar-fill" style="width:${pct}%;background:${colors.fill};"></div>
+              </div>
+            </div>
+          </div>`
+    }).join("")
+
+    return `
+      <div style="margin-bottom:16px;">
+        <div class="gantt-header">
+          <div class="name-col"></div>
+          ${unitLabels.map(l=>`<div class="unit">${l}</div>`).join("")}
+        </div>
+        ${rows}
+      </div>`
+}
+
+function buildActionsTableHtml(actionRows, m){
+    if(actionRows.length === 0){
+        return `<div style="font-size:11px;color:#999;">Aucune action associée à ce projet.</div>`
+    }
+    let rows = actionRows.map(r=>{
+        let name = displayValue(r[m.idAction])
+        let porteur = displayValue(r[m.porteur])
+        let pct = getPercent(r[m.avancement])
+        let interrompu = isInterrompu(r, m)
+        let colors = bandColors(pct, interrompu)
+        let label = interrompu ? "Interrompu" : `${pct}%`
+        return `<tr>
+            <td>${escapeHtml(name)}</td>
+            <td>${escapeHtml(porteur)}</td>
+            <td><span class="pct-badge" style="background:${colors.pale};color:${colors.text};">${label}</span></td>
+          </tr>`
+    }).join("")
+    return `
+      <table class="actions-table">
+        <tr><th>Action</th><th>Porteur</th><th>Avancement</th></tr>
+        ${rows}
+      </table>`
+}
+
+// ===== Export PDF =====
+document.getElementById("generateBtn").onclick = async ()=>{
+    let btn = document.getElementById("generateBtn")
+    let status = document.getElementById("status")
+    btn.disabled = true
+    status.textContent = "Génération du PDF…"
+
+    try{
+        let pages = document.querySelectorAll(".pdf-page")
+        let pdf = new window.jspdf.jsPDF({orientation:"landscape", unit:"px", format:[1123,794]})
+
+        for(let i=0; i<pages.length; i++){
+            let canvas = await html2canvas(pages[i], {scale:2, useCORS:true})
+            let imgData = canvas.toDataURL("image/jpeg", 0.95)
+            if(i>0) pdf.addPage([1123,794], "landscape")
+            pdf.addImage(imgData, "JPEG", 0, 0, 1123, 794)
+        }
+
+        let filename = (projectSelect.value || "recap").replace(/[^a-z0-9_\-]+/gi, "_").slice(0,60) + ".pdf"
+        pdf.save(filename)
+        status.textContent = ""
+    }catch(err){
+        status.textContent = "Erreur lors de la génération du PDF."
+        console.error(err)
+    }
+    btn.disabled = false
+}
+
+grist.onRecords((records, mappings)=>{
+    currentRecords = records
+    currentMappings = mappings
+    renderPages()
+})
+</script>
+</body>
+</html>
