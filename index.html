@@ -857,10 +857,19 @@ async function renderPages(){
     document.getElementById("generateBtn").disabled = false
 
     let projectRow = currentRecords.find(r => isProjectRow(r, m) && normalizeId(displayValue(r[m.idProjet])) === selectedId)
-    let actionRows = currentRecords.filter(r =>
+    let genuineActionRows = currentRecords.filter(r =>
         !isProjectRow(r, m) &&
         normalizeId(displayValue(r[m.idProjet])) === selectedId
     )
+    // Certaines lignes ont une Nature valant AV/PEPS par erreur (souvent quand leur intitulé
+    // reprend celui du projet), ce qui les fait disparaître alors que ce sont en réalité des
+    // actions. On ne les récupère que s'il n'existe aucune autre action réelle pour ce projet.
+    let misclassifiedRows = currentRecords.filter(r =>
+        isProjectRow(r, m) &&
+        normalizeId(displayValue(r[m.idProjet])) === selectedId &&
+        (!projectRow || r.id !== projectRow.id)
+    )
+    let actionRows = genuineActionRows.length > 0 ? genuineActionRows : misclassifiedRows
 
     let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
     let mainBodyHtml = buildMainBodyHtml(projectRow, actionRows, m)
