@@ -887,7 +887,10 @@ async function renderPages(){
         normalizeId(displayValue(r[m.idProjet])) === selectedId &&
         (!projectRow || r.id !== projectRow.id)
     )
-    let actionRows = genuineActionRows.length > 0 ? genuineActionRows : misclassifiedRows
+    // Si aucune vraie action (Nature=MEO) ni ligne dupliquée mal classée n'existe, la ligne du
+    // projet elle-même sert de seule action (même intitulé, mêmes dates, tâches rattachées dessus).
+    let fallbackRows = misclassifiedRows.length > 0 ? misclassifiedRows : (projectRow ? [projectRow] : [])
+    let actionRows = genuineActionRows.length > 0 ? genuineActionRows : fallbackRows
 
     let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
     let mainBodyHtml = buildMainBodyHtml(projectRow, actionRows, m)
