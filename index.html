@@ -111,12 +111,14 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;white-spa
   <input type="text" id="projectSelect" list="projectOptions" placeholder="Choisir un projet… (tapez pour rechercher)" autocomplete="off" style="min-height:34px;padding:4px 8px;font-size:13px;flex:1 1 320px;max-width:520px;border:1px solid #ccc;border-radius:4px;">
   <datalist id="projectOptions"></datalist>
   <button id="generateBtn">Télécharger le PDF</button>
-  <button id="saveForLaterBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;">💾 Sauvegarder pour plus tard</button>
+  <div style="display:flex;flex-direction:column;gap:2px;">
+    <button id="saveForLaterBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;">💾 Sauvegarder pour plus tard</button>
+    <span style="font-size:10.5px;color:var(--red);font-weight:400;">Sauvegarde supprimée automatiquement après 1 mois</span>
+  </div>
   <button id="deleteSaveBtn" type="button" style="display:none;min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #b91c1c;background:#fff;color:#b91c1c;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;">🗑 Supprimer la sauvegarde</button>
   <button id="resetBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;color:#333;">Réinitialiser</button>
   <span id="status"></span>
 </div>
-<div style="padding:0 14px 8px 14px;background:#fff;font-size:11px;color:#888;font-style:italic;">Sauvegarde supprimée automatiquement après 1 mois</div>
 
 <div id="extraCommentBar" style="padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;">
   <label for="extraCommentInput" style="display:block;font-size:12px;color:#555;margin-bottom:4px;">Commentaire additionnel (imprimé sur le PDF, sauvegarde manuelle par projet)</label>
