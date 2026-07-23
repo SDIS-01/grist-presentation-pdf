@@ -286,35 +286,61 @@ function renderPages(){
         displayValue(r[m.idProjet]) === selectedId
     )
 
+    let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
+    let mainBodyHtml = buildMainBodyHtml(projectRow, actionRows, m)
+    let journalBodyHtml = buildJournalBodyHtml(projectRow, m)
+
+    // Mesure la hauteur nécessaire si tout tenait sur une seule page, hors écran
+    let probe = document.createElement("div")
+    probe.style.position = "absolute"
+    probe.style.left = "-9999px"
+    probe.style.top = "0"
+    document.body.appendChild(probe)
+    let testPage = buildPageShell(title, "Page 1/1", mainBodyHtml + journalBodyHtml, true)
+    probe.appendChild(testPage)
+    let combinedHeight = testPage.scrollHeight
+    document.body.removeChild(probe)
+
     container.innerHTML = ""
-    container.appendChild(buildPage1(projectRow, actionRows, m))
-    container.appendChild(buildPage2(projectRow, m))
+    if(combinedHeight <= 794){
+        container.appendChild(buildPageShell(title, "Page 1/1", mainBodyHtml + journalBodyHtml, false))
+    } else {
+        container.appendChild(buildPageShell(title, "Page 1/2", mainBodyHtml, false))
+        container.appendChild(buildPageShell(title, "Page 2/2", journalBodyHtml, false))
+    }
 }
 
 function headerHtml(){
     return `<img src="${HEADER_IMAGE_BASE64}" alt="SDIS de l'Ain">`
 }
 
-function buildPage1(projectRow, actionRows, m){
+function buildPageShell(title, pageLabel, bodyHtml, autoHeight){
     let page = document.createElement("div")
     page.className = "pdf-page"
+    if(autoHeight) page.style.height = "auto"
+    page.innerHTML = `
+      <div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
+      <div class="page-body">
+        <div class="proj-title-row" style="justify-content:flex-end;">
+          <div class="page-num">${pageLabel}</div>
+        </div>
+        ${bodyHtml}
+      </div>
+      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
+    `
+    return page
+}
 
-    let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
+function buildMainBodyHtml(projectRow, actionRows, m){
     let groupement = projectRow ? displayValue(projectRow[m.groupement]) : ""
     let porteur = projectRow ? displayValue(projectRow[m.porteur]) : ""
     let priorite = projectRow ? displayValue(projectRow[m.priorite]) : ""
     let commentaire = projectRow ? displayValue(projectRow[m.commentaire]) : ""
     let passageInstance = projectRow ? displayValue(projectRow[m.passageInstance]) : ""
     let avancementGlobal = projectRow ? getPercent(projectRow[m.avancement]) : 0
-    let projInterrompu = projectRow ? isInterrompu(projectRow, m) : false
     let donutColors = {fill:"var(--green)", pale:"var(--green-pale)", text:"var(--green-text)"}
 
-    page.innerHTML = `
-      <div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
-      <div class="page-body">
-        <div class="proj-title-row" style="justify-content:flex-end;">
-          <div class="page-num">Page 1/2</div>
-        </div>
+    return `
         <div class="body-flex">
           <div class="left-col">
             <div class="donut-row">
@@ -338,33 +364,18 @@ function buildPage1(projectRow, actionRows, m){
             ${buildActionsTableHtml(actionRows, m, actionNumbers(actionRows))}
           </div>
         </div>
-      </div>
-      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
     `
-    return page
 }
 
-function buildPage2(projectRow, m){
-    let page = document.createElement("div")
-    page.className = "pdf-page"
-
+function buildJournalBodyHtml(projectRow, m){
     let journal = projectRow ? displayValue(projectRow[m.journalBord]) : ""
-    let title = projectRow ? displayValue(projectRow[m.idProjet]) : ""
     let extraComment = document.getElementById("extraCommentInput").value.trim()
 
-    page.innerHTML = `
-      <div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
-      <div class="page-body">
-        <div class="proj-title-row" style="justify-content:flex-end;">
-          <div class="page-num">Page 2/2</div>
-        </div>
-        <div class="section-title">Journal de bord</div>
+    return `
+        <div class="section-title" style="margin-top:18px;">Journal de bord</div>
         ${journal ? journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("") : `<div style="font-size:11px;color:#999;">Aucune entrée</div>`}
         ${extraComment ? `<div class="section-title" style="margin-top:18px;">Commentaire additionnel</div><div class="comment-box">${escapeHtml(extraComment)}</div>` : ``}
-      </div>
-      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
     `
-    return page
 }
 
 function selectedIdFallback(){
