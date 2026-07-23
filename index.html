@@ -178,6 +178,10 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;white-spa
 <script>
 grist.ready({
 requiredAccess:'full',
+onEditOptions: function(){
+    fillTasksConfigInputs()
+    document.getElementById("tasksConfigModal").style.display = "flex"
+},
 columns:[
 {name:'idProjet',title:'ID_Projet_Action_AV'},
 {name:'idAction',title:'ID_Action_MEO'},
@@ -376,13 +380,6 @@ grist.onOptions((options)=>{
     if(options && options.includeTasks){
         document.getElementById("includeTasksCheckbox").checked = true
     }
-})
-
-// Ouvre la configuration des tâches depuis le bouton natif "Ouvrir la configuration"
-// du panneau latéral droit de Grist (menu ⋮ du widget).
-grist.onEditOptions(()=>{
-    fillTasksConfigInputs()
-    document.getElementById("tasksConfigModal").style.display = "flex"
 })
 
 function refToRowId(ref){
