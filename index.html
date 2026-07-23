@@ -111,18 +111,22 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;white-spa
   <input type="text" id="projectSelect" list="projectOptions" placeholder="Choisir un projet… (tapez pour rechercher)" autocomplete="off" style="min-height:34px;padding:4px 8px;font-size:13px;flex:1 1 320px;max-width:520px;border:1px solid #ccc;border-radius:4px;">
   <datalist id="projectOptions"></datalist>
   <button id="generateBtn">Télécharger le PDF</button>
+  <button id="saveForLaterBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #2e7d32;background:#fff;color:#2e7d32;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;">💾 Sauvegarder pour plus tard</button>
+  <button id="deleteSaveBtn" type="button" style="display:none;min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #b91c1c;background:#fff;color:#b91c1c;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;">🗑 Supprimer la sauvegarde</button>
   <button id="resetBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;color:#333;">Réinitialiser</button>
   <span id="status"></span>
 </div>
+<div style="padding:0 14px 8px 14px;background:#fff;font-size:11px;color:#888;font-style:italic;">Votre sauvegarde sera automatiquement supprimée au bout d'un mois.</div>
 
 <div id="extraCommentBar" style="padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;">
-  <label for="extraCommentInput" style="display:block;font-size:12px;color:#555;margin-bottom:4px;">Commentaire additionnel (imprimé sur le PDF, non enregistré dans Grist)</label>
+  <label for="extraCommentInput" style="display:block;font-size:12px;color:#555;margin-bottom:4px;">Commentaire additionnel (imprimé sur le PDF, sauvegarde manuelle par projet)</label>
   <textarea id="extraCommentInput" rows="3" style="width:100%;max-width:700px;box-sizing:border-box;padding:6px 8px;font-size:12px;font-family:Tahoma,Geneva,sans-serif;border:1px solid #ccc;border-radius:4px;resize:vertical;" placeholder="Écrire un commentaire à inclure dans ce PDF…"></textarea>
+  <div id="extraCommentControls" style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;"></div>
 </div>
 
 <div id="manualPagesBar" style="padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-    <label style="font-size:12px;color:#555;">Pages additionnelles (texte libre + image, imprimées sur le PDF, non enregistrées dans Grist — 4 pages maximum au total)</label>
+    <label style="font-size:12px;color:#555;">Pages additionnelles (texte libre + image, imprimées sur le PDF, sauvegarde manuelle par projet — 4 pages maximum au total)</label>
     <button id="addPageBtn" type="button" style="min-height:30px;padding:5px 12px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;white-space:nowrap;">+ Ajouter une page</button>
   </div>
   <div id="manualPagesList"></div>
@@ -223,13 +227,28 @@ function footerWithDate(){
 
 document.getElementById("resetBtn").onclick = ()=>{
     projectSelect.value = ""
-    document.getElementById("extraCommentInput").value = ""
     document.getElementById("status").textContent = ""
-    manualPages = []
     selectedTaskActionIds = new Set()
     taskActionIdsSeen = new Set()
-    renderManualPagesControls()
     renderPages()
+}
+
+document.getElementById("saveForLaterBtn").onclick = ()=>{
+    if(!currentProjectIdForPages){
+        document.getElementById("status").textContent = "Sélectionnez d'abord un projet."
+        return
+    }
+    savePagesDataForProject(currentProjectIdForPages)
+    updateSaveDeleteButtons()
+    document.getElementById("status").textContent = "Sauvegardé."
+}
+
+document.getElementById("deleteSaveBtn").onclick = ()=>{
+    if(!currentProjectIdForPages) return
+    deleteSavedPagesForProject(currentProjectIdForPages)
+    loadPagesDataForProject(currentProjectIdForPages)
+    renderPages()
+    document.getElementById("status").textContent = "Sauvegarde supprimée."
 }
 
 grist.onOptions((options)=>{
@@ -370,6 +389,52 @@ projectSelect.oninput = ()=>{
 }
 document.getElementById("extraCommentInput").oninput = renderPages
 
+function renderExtraCommentControls(){
+    let container = document.getElementById("extraCommentControls")
+    container.innerHTML = `
+      <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px;">
+        Taille
+        <select id="extraCommentFontSize" style="font-size:12px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;">
+          ${[10,11,12,13,14,16,18,20,24,28].map(sz=>
+              `<option value="${sz}" ${(extraCommentStyle.fontSize||13)===sz ? "selected" : ""}>${sz}</option>`
+          ).join("")}
+        </select>
+      </label>
+      <button type="button" id="extraCommentBold" style="font-weight:700;font-size:12px;width:26px;height:26px;border:1px solid ${extraCommentStyle.bold?'#002395':'#ccc'};background:${extraCommentStyle.bold?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">G</button>
+      <button type="button" id="extraCommentItalic" style="font-style:italic;font-size:12px;width:26px;height:26px;border:1px solid ${extraCommentStyle.italic?'#002395':'#ccc'};background:${extraCommentStyle.italic?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">I</button>
+      <button type="button" id="extraCommentUnderline" style="text-decoration:underline;font-size:12px;width:26px;height:26px;border:1px solid ${extraCommentStyle.underline?'#002395':'#ccc'};background:${extraCommentStyle.underline?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">S</button>
+      <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px;">
+        Couleur
+        <select id="extraCommentColor" style="font-size:12px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;">
+          ${TEXT_COLOR_PALETTE.map(c=>`<option value="${c.value}" ${(extraCommentStyle.color||"#1a1a1a")===c.value ? "selected" : ""}>${c.label}</option>`).join("")}
+        </select>
+      </label>
+    `
+    document.getElementById("extraCommentFontSize").onchange = (e)=>{
+        extraCommentStyle.fontSize = Number(e.target.value)
+        renderPages()
+    }
+    document.getElementById("extraCommentBold").onclick = ()=>{
+        extraCommentStyle.bold = !extraCommentStyle.bold
+        renderExtraCommentControls()
+        renderPages()
+    }
+    document.getElementById("extraCommentItalic").onclick = ()=>{
+        extraCommentStyle.italic = !extraCommentStyle.italic
+        renderExtraCommentControls()
+        renderPages()
+    }
+    document.getElementById("extraCommentUnderline").onclick = ()=>{
+        extraCommentStyle.underline = !extraCommentStyle.underline
+        renderExtraCommentControls()
+        renderPages()
+    }
+    document.getElementById("extraCommentColor").onchange = (e)=>{
+        extraCommentStyle.color = e.target.value
+        renderPages()
+    }
+}
+
 // ===== Actions MEO avec leurs tâches (table séparée) =====
 let tasksConfig = {
     tableId:"", refCol:"", labelCol:"Libelle_Tache", commentaireCol:"Commentaire",
@@ -454,6 +519,10 @@ grist.onOptions((options)=>{
     }
     if(options && options.includeTasks){
         document.getElementById("includeTasksCheckbox").checked = true
+    }
+    if(options && options.pagesDataByProject){
+        pagesDataByProject = options.pagesDataByProject
+        cleanupExpiredSaves()
     }
 })
 
@@ -547,7 +616,7 @@ function buildAtomicAuxEntries(projectRow, actionRows, selectedActionRows, tasks
 
     let extraComment = document.getElementById("extraCommentInput").value.trim()
     if(extraComment){
-        entries.push({kind:'extraComment', html:`<div class="comment-box">${escapeHtml(extraComment)}</div>`})
+        entries.push({kind:'extraComment', html:`<div class="comment-box" style="${textStyleFor(extraCommentStyle)}">${escapeHtml(extraComment)}</div>`})
     }
 
     if(tasksByActionId){
@@ -620,7 +689,80 @@ function packAuxPages(entries, title){
 }
 
 // ===== Rendu des pages =====
+const SAVE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000 // 1 mois
+
+const TEXT_COLOR_PALETTE = [
+    {value:"#1a1a1a", label:"Noir (texte)"},
+    {value:"#002395", label:"Bleu France"},
+    {value:"#C0504D", label:"Rouge"},
+    {value:"#DF453D", label:"Rouge SDIS (logo)"},
+    {value:"#F79646", label:"Orange"},
+    {value:"#FFCC00", label:"Jaune"},
+    {value:"#9BBB59", label:"Vert"},
+    {value:"#595959", label:"Gris foncé"}
+]
+
 let manualPages = [] // {text:"", imageDataUrl:null}
+let extraCommentStyle = {fontSize:13, bold:false, italic:false, underline:false, color:"#1a1a1a"}
+let pagesDataByProject = {} // { [idProjet]: {extraComment, extraCommentStyle, manualPages, savedAt} }, persisté dans Grist
+let currentProjectIdForPages = null
+
+function cleanupExpiredSaves(){
+    let changed = false
+    let now = Date.now()
+    Object.keys(pagesDataByProject).forEach(id=>{
+        let entry = pagesDataByProject[id]
+        if(!entry || !entry.savedAt || (now - entry.savedAt) > SAVE_RETENTION_MS){
+            delete pagesDataByProject[id]
+            changed = true
+        }
+    })
+    if(changed) grist.setOption("pagesDataByProject", pagesDataByProject)
+}
+
+function savePagesDataForProject(id){
+    if(!id) return
+    pagesDataByProject[id] = {
+        extraComment: document.getElementById("extraCommentInput").value,
+        extraCommentStyle: Object.assign({}, extraCommentStyle),
+        manualPages: JSON.parse(JSON.stringify(manualPages)),
+        savedAt: Date.now()
+    }
+    grist.setOption("pagesDataByProject", pagesDataByProject)
+}
+
+function deleteSavedPagesForProject(id){
+    if(!id) return
+    delete pagesDataByProject[id]
+    grist.setOption("pagesDataByProject", pagesDataByProject)
+}
+
+function hasSavedPagesForProject(id){
+    return !!(id && pagesDataByProject[id])
+}
+
+function loadPagesDataForProject(id){
+    currentProjectIdForPages = id
+    let data = id ? pagesDataByProject[id] : null
+    if(data){
+        document.getElementById("extraCommentInput").value = data.extraComment || ""
+        extraCommentStyle = Object.assign({fontSize:13, bold:false, italic:false, underline:false, color:"#1a1a1a"}, data.extraCommentStyle || {})
+        manualPages = JSON.parse(JSON.stringify(data.manualPages || []))
+    } else {
+        document.getElementById("extraCommentInput").value = ""
+        extraCommentStyle = {fontSize:13, bold:false, italic:false, underline:false, color:"#1a1a1a"}
+        manualPages = []
+    }
+    renderManualPagesControls()
+    renderExtraCommentControls()
+    updateSaveDeleteButtons()
+}
+
+function updateSaveDeleteButtons(){
+    let deleteBtn = document.getElementById("deleteSaveBtn")
+    if(!deleteBtn) return
+    deleteBtn.style.display = hasSavedPagesForProject(currentProjectIdForPages) ? "inline-block" : "none"
+}
 
 async function renderPages(){
     let container = document.getElementById("pagesContainer")
@@ -628,9 +770,17 @@ async function renderPages(){
     refreshProjectList()
 
     let selectedId = normalizeId(projectSelect.value)
+
+    // Les pages additionnelles et le commentaire sont propres à chaque projet :
+    // on sauvegarde ceux du projet précédent puis on charge ceux du nouveau.
+    if(selectedId !== currentProjectIdForPages){
+        loadPagesDataForProject(selectedId)
+    }
+
     if(!selectedId || !m.idProjet){
         container.innerHTML = `<div style="color:#888;font-size:13px;padding:40px;">Sélectionnez un projet ci-dessus pour afficher son récapitulatif.</div>`
         document.getElementById("generateBtn").disabled = true
+        document.getElementById("tasksActionsList").innerHTML = ""
         updateAddPageState(1)
         return
     }
@@ -790,7 +940,9 @@ function renderManualPagesControls(){
             <button type="button" class="manualPageUnderline" data-idx="${i}" style="text-decoration:underline;font-size:12px;width:26px;height:26px;border:1px solid ${p.underline?'#002395':'#ccc'};background:${p.underline?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">S</button>
             <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px;">
               Couleur
-              <input type="color" class="manualPageColor" data-idx="${i}" value="${p.color||'#1a1a1a'}" style="width:30px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;">
+              <select class="manualPageColor" data-idx="${i}" style="font-size:12px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;">
+                ${TEXT_COLOR_PALETTE.map(c=>`<option value="${c.value}" ${(p.color||"#1a1a1a")===c.value ? "selected" : ""}>${c.label}</option>`).join("")}
+              </select>
             </label>
           </div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
@@ -857,7 +1009,7 @@ function renderManualPagesControls(){
         }
     })
     list.querySelectorAll(".manualPageColor").forEach(el=>{
-        el.oninput = (e)=>{
+        el.onchange = (e)=>{
             manualPages[Number(e.target.dataset.idx)].color = e.target.value
             renderPages()
         }
