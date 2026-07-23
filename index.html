@@ -266,6 +266,13 @@ function displayValue(v){
     return String(v)
 }
 
+// Neutralise les espaces superflus (début/fin, espaces multiples) pour que la
+// correspondance entre l'ID_Projet du projet et celui des actions ne casse pas
+// à cause d'un espace tapé ou copié-collé par erreur dans Grist.
+function normalizeId(s){
+    return String(s || "").replace(/\s+/g, " ").trim()
+}
+
 function getPercent(v){
     if(v===null || v===undefined || v==="") return 0
     let n = Number(v)
@@ -299,14 +306,14 @@ function bandColors(pct, interrompu, useGlobalPalette){
     return {fill:"var(--red)", pale:"var(--red-pale)", text:"var(--red-text)"}
 }
 
-function priorityColor(label){
+function priorityBadgeStyle(label){
     let s = (label||"").toLowerCase()
-    if(s.startsWith("p1")) return "var(--red-text)"
-    if(s.startsWith("p2")) return "var(--orange-text)"
-    if(s.startsWith("p3")) return "var(--yellow-text)"
-    if(s.startsWith("interrompu")) return "var(--gray-text)"
-    if(s.startsWith("termin")) return "var(--green-text)"
-    return "var(--bleu-france)"
+    if(s.startsWith("p1")) return {bg:"var(--red)", color:"#fff"}
+    if(s.startsWith("p2")) return {bg:"var(--orange)", color:"#fff"}
+    if(s.startsWith("p3")) return {bg:"var(--yellow)", color:"#4d3d00"}
+    if(s.startsWith("interrompu")) return {bg:"#595959", color:"#fff"}
+    if(s.startsWith("termin")) return {bg:"var(--green)", color:"#fff"}
+    return {bg:"var(--bleu-france)", color:"#fff"}
 }
 
 function escapeHtml(s){
@@ -328,7 +335,7 @@ function refreshProjectList(){
     if(!m.idProjet || !m.nature) return
     let projects = currentRecords
         .filter(r => isProjectRow(r, m))
-        .map(r => displayValue(r[m.idProjet]))
+        .map(r => normalizeId(displayValue(r[m.idProjet])))
         .filter(v => v !== "")
     knownProjects = [...new Set(projects)].sort((a,b)=>a.localeCompare(b,'fr',{sensitivity:'base'}))
 
@@ -454,11 +461,13 @@ function buildActionsTasksRecapHtml(actionRows, tasksByActionId, m){
               </tr>`
         }).join("")
 
+        let label = interrompu ? "Interrompu" : (avancement!==null ? `${avancement}%` : "")
+
         return `
           <tr class="action-row">
             <td style="font-weight:700;">${escapeHtml(name)}</td>
             <td>${escapeHtml(porteur)}</td>
-            <td>${avancement!==null ? `<span style="color:${colors.text};font-weight:700;">${avancement}%</span>` : ""}</td>
+            <td>${label ? `<span class="pct-badge" style="background:${colors.pale};color:${colors.text};">${label}</span>` : ""}</td>
             <td>${escapeHtml(commentaire)}</td>
           </tr>
           ${taskRows}`
@@ -495,7 +504,7 @@ async function renderPages(){
     let m = currentMappings
     refreshProjectList()
 
-    let selectedId = projectSelect.value
+    let selectedId = normalizeId(projectSelect.value)
     if(!selectedId || !m.idProjet){
         container.innerHTML = `<div style="color:#888;font-size:13px;padding:40px;">Sélectionnez un projet ci-dessus pour afficher son récapitulatif.</div>`
         document.getElementById("generateBtn").disabled = true
@@ -504,10 +513,10 @@ async function renderPages(){
     }
     document.getElementById("generateBtn").disabled = false
 
-    let projectRow = currentRecords.find(r => isProjectRow(r, m) && displayValue(r[m.idProjet]) === selectedId)
+    let projectRow = currentRecords.find(r => isProjectRow(r, m) && normalizeId(displayValue(r[m.idProjet])) === selectedId)
     let actionRows = currentRecords.filter(r =>
         !isProjectRow(r, m) &&
-        displayValue(r[m.idProjet]) === selectedId
+        normalizeId(displayValue(r[m.idProjet])) === selectedId
     )
 
     let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
@@ -774,7 +783,14 @@ function buildMainBodyHtml(projectRow, actionRows, m){
         {flag: m.mec2023, label: "MEC 2023"},
         {flag: m.duerp, label: "DUERP"},
         {flag: m.vissct, label: "VISSCT"}
-    ].filter(r => r.flag && isFlagTrue(projectRow ? projectRow[r.flag] : null))
+    ].map(r=>{
+        if(!r.flag || !projectRow) return null
+        let raw = projectRow[r.flag]
+        if(!isFlagTrue(raw)) return null
+        let text = displayValue(raw).trim()
+        let isBooleanish = (raw === true || text.toLowerCase() === "true" || text === "1")
+        return {label: r.label, text: isBooleanish ? "" : text}
+    }).filter(r => r !== null)
 
     return `
         <div class="body-flex">
@@ -788,11 +804,11 @@ function buildMainBodyHtml(projectRow, actionRows, m){
             <div class="badge-list">
               ${groupement ? `<div class="badge-item"><span class="k">Groupement</span> <span class="v">${escapeHtml(groupement)}</span></div>` : ``}
               ${porteur ? `<div class="badge-item"><span class="k">Porteur</span> <span class="v">${escapeHtml(porteur)}</span></div>` : ``}
-              ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="v" style="color:${priorityColor(priorite)};">${escapeHtml(priorite)}</span></div>` : ``}
+              ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="pct-badge" style="background:${priorityBadgeStyle(priorite).bg};color:${priorityBadgeStyle(priorite).color};">${escapeHtml(priorite)}</span></div>` : ``}
             </div>
             ${rattachements.length > 0 ? `
               <div class="tags-row">
-                ${rattachements.map(r=>`<span class="tag-chip">${escapeHtml(r.label)}</span>`).join("")}
+                ${rattachements.map(r=>`<span class="tag-chip">${escapeHtml(r.text ? `${r.label} : ${r.text}` : r.label)}</span>`).join("")}
               </div>` : ``}
             ${descriptif ? `<div class="section-title">Descriptif</div><div class="comment-box">${escapeHtml(descriptif)}</div>` : ``}
             ${commentaire ? `<div class="section-title">Commentaire</div><div class="comment-box">${escapeHtml(commentaire)}</div>` : ``}
