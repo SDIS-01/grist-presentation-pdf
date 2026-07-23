@@ -650,6 +650,7 @@ function buildAtomicAuxEntries(projectRow, actionRows, selectedActionRows, tasks
     }
 
     actionRows.forEach(a=>{
+        if(projectRow && a.id === projectRow.id) return // même ligne que le projet : déjà affichée au-dessus
         let j = m.journalBord ? displayValue(a[m.journalBord]) : ""
         if(j.trim() !== ""){
             let name = displayValue(a[m.idAction])
