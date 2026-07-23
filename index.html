@@ -134,30 +134,40 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;white-spa
     <input type="checkbox" id="includeTasksCheckbox">
     Inclure les actions MEO avec leurs tâches
   </label>
-  <div id="tasksConfigFields" style="display:none;margin-top:10px;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Table des tâches (nom exact dans Grist)</label>
-      <input type="text" id="tasksTableIdInput" placeholder="ex: Taches" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+</div>
+
+<div id="tasksConfigModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:20px;width:520px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,.3);">
+    <h3 style="margin:0 0 4px 0;font-size:15px;color:#002395;">Configuration — Actions MEO et tâches</h3>
+    <div style="font-size:11px;color:#888;margin-bottom:14px;">Les tâches sont stockées dans une table Grist séparée, reliée à l'action par une colonne de référence. Indiquez ici les identifiants exacts utilisés dans Grist.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Table des tâches (nom exact dans Grist)</label>
+        <input type="text" id="tasksTableIdInput" placeholder="ex: Taches" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Colonne de référence vers l'action</label>
+        <input type="text" id="tasksRefColInput" placeholder="ex: Action" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Colonne Libellé de la tâche</label>
+        <input type="text" id="tasksLabelColInput" placeholder="ex: Libelle_Tache" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Colonne Commentaire de la tâche</label>
+        <input type="text" id="tasksCommentaireColInput" placeholder="ex: Commentaire" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Colonne Avancement de la tâche</label>
+        <input type="text" id="tasksAvancementColInput" placeholder="ex: Avancement" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
+      <div>
+        <label style="display:block;font-size:11px;color:#888;">Colonne Responsable de la tâche</label>
+        <input type="text" id="tasksResponsableColInput" placeholder="ex: Responsable" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+      </div>
     </div>
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Colonne de référence vers l'action</label>
-      <input type="text" id="tasksRefColInput" placeholder="ex: Action" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-    </div>
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Colonne Libellé de la tâche</label>
-      <input type="text" id="tasksLabelColInput" placeholder="ex: Libelle_Tache" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-    </div>
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Colonne Commentaire de la tâche</label>
-      <input type="text" id="tasksCommentaireColInput" placeholder="ex: Commentaire" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-    </div>
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Colonne Avancement de la tâche</label>
-      <input type="text" id="tasksAvancementColInput" placeholder="ex: Avancement" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
-    </div>
-    <div>
-      <label style="display:block;font-size:11px;color:#888;">Colonne Responsable de la tâche</label>
-      <input type="text" id="tasksResponsableColInput" placeholder="ex: Responsable" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button id="closeTasksConfigBtn" type="button" style="padding:6px 14px;font-size:12px;border-radius:4px;cursor:pointer;background:#002395;color:#fff;border:none;">Fermer</button>
     </div>
   </div>
 </div>
@@ -335,7 +345,6 @@ function fillTasksConfigInputs(){
 }
 
 document.getElementById("includeTasksCheckbox").onchange = (e)=>{
-    document.getElementById("tasksConfigFields").style.display = e.target.checked ? "grid" : "none"
     grist.setOption("includeTasks", e.target.checked)
     renderPages()
 }
@@ -355,6 +364,10 @@ document.getElementById("includeTasksCheckbox").onchange = (e)=>{
     }
 })
 
+document.getElementById("closeTasksConfigBtn").onclick = ()=>{
+    document.getElementById("tasksConfigModal").style.display = "none"
+}
+
 grist.onOptions((options)=>{
     if(options && options.tasksConfig){
         tasksConfig = Object.assign(tasksConfig, options.tasksConfig)
@@ -362,8 +375,14 @@ grist.onOptions((options)=>{
     }
     if(options && options.includeTasks){
         document.getElementById("includeTasksCheckbox").checked = true
-        document.getElementById("tasksConfigFields").style.display = "grid"
     }
+})
+
+// Ouvre la configuration des tâches depuis le bouton natif "Ouvrir la configuration"
+// du panneau latéral droit de Grist (menu ⋮ du widget).
+grist.onEditOptions(()=>{
+    fillTasksConfigInputs()
+    document.getElementById("tasksConfigModal").style.display = "flex"
 })
 
 function refToRowId(ref){
@@ -523,6 +542,15 @@ function updateAddPageState(autoPageCount){
     if(addBtn) addBtn.disabled = (autoPageCount + manualPages.length) >= 4
 }
 
+function textStyleFor(page){
+    let fontSize = page.fontSize || 13
+    let bold = page.bold ? "700" : "400"
+    let italic = page.italic ? "italic" : "normal"
+    let underline = page.underline ? "underline" : "none"
+    let color = page.color || "#1a1a1a"
+    return `font-size:${fontSize}px;font-weight:${bold};font-style:${italic};text-decoration:${underline};color:${color};`
+}
+
 function buildManualPageBodyHtml(page){
     let layout = page.layout || "top"
     let hasImage = !!page.imageDataUrl
@@ -530,7 +558,7 @@ function buildManualPageBodyHtml(page){
 
     let imgHtml = hasImage ? `<img src="${page.imageDataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;">` : ``
     let textHtml = hasText
-        ? `<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">${escapeHtml(page.text)}</div>`
+        ? `<div style="white-space:pre-wrap;line-height:1.6;${textStyleFor(page)}">${escapeHtml(page.text)}</div>`
         : (hasImage ? `` : `<div style="font-size:11px;color:#999;font-style:italic;">Page vierge — ajoutez du texte ou une image via les contrôles ci-dessus.</div>`)
 
     if(!hasImage) return `<div style="padding-top:6px;">${textHtml}</div>`
@@ -580,6 +608,23 @@ function renderManualPagesControls(){
             <button type="button" class="removePageBtn" data-idx="${i}" style="font-size:11px;border:1px solid #ccc;background:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;">Supprimer</button>
           </div>
           <textarea class="manualPageText" data-idx="${i}" rows="3" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;font-family:Tahoma,Geneva,sans-serif;border:1px solid #ccc;border-radius:4px;resize:vertical;" placeholder="Texte libre pour cette page…">${escapeHtml(p.text)}</textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+            <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px;">
+              Taille
+              <select class="manualPageFontSize" data-idx="${i}" style="font-size:12px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;">
+                ${[10,11,12,13,14,16,18,20,24,28].map(sz=>
+                    `<option value="${sz}" ${(p.fontSize||13)===sz ? "selected" : ""}>${sz}</option>`
+                ).join("")}
+              </select>
+            </label>
+            <button type="button" class="manualPageBold" data-idx="${i}" style="font-weight:700;font-size:12px;width:26px;height:26px;border:1px solid ${p.bold?'#002395':'#ccc'};background:${p.bold?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">G</button>
+            <button type="button" class="manualPageItalic" data-idx="${i}" style="font-style:italic;font-size:12px;width:26px;height:26px;border:1px solid ${p.italic?'#002395':'#ccc'};background:${p.italic?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">I</button>
+            <button type="button" class="manualPageUnderline" data-idx="${i}" style="text-decoration:underline;font-size:12px;width:26px;height:26px;border:1px solid ${p.underline?'#002395':'#ccc'};background:${p.underline?'#eef2f8':'#fff'};border-radius:4px;cursor:pointer;">S</button>
+            <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:4px;">
+              Couleur
+              <input type="color" class="manualPageColor" data-idx="${i}" value="${p.color||'#1a1a1a'}" style="width:30px;height:26px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;">
+            </label>
+          </div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
             <input type="file" class="manualPageImage" data-idx="${i}" accept="image/*" style="font-size:12px;">
             <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:6px;">
@@ -611,6 +656,42 @@ function renderManualPagesControls(){
                 renderPages()
             }
             reader.readAsDataURL(file)
+        }
+    })
+    list.querySelectorAll(".manualPageFontSize").forEach(el=>{
+        el.onchange = (e)=>{
+            manualPages[Number(e.target.dataset.idx)].fontSize = Number(e.target.value)
+            renderPages()
+        }
+    })
+    list.querySelectorAll(".manualPageBold").forEach(el=>{
+        el.onclick = (e)=>{
+            let idx = Number(e.target.dataset.idx)
+            manualPages[idx].bold = !manualPages[idx].bold
+            renderManualPagesControls()
+            renderPages()
+        }
+    })
+    list.querySelectorAll(".manualPageItalic").forEach(el=>{
+        el.onclick = (e)=>{
+            let idx = Number(e.target.dataset.idx)
+            manualPages[idx].italic = !manualPages[idx].italic
+            renderManualPagesControls()
+            renderPages()
+        }
+    })
+    list.querySelectorAll(".manualPageUnderline").forEach(el=>{
+        el.onclick = (e)=>{
+            let idx = Number(e.target.dataset.idx)
+            manualPages[idx].underline = !manualPages[idx].underline
+            renderManualPagesControls()
+            renderPages()
+        }
+    })
+    list.querySelectorAll(".manualPageColor").forEach(el=>{
+        el.oninput = (e)=>{
+            manualPages[Number(e.target.dataset.idx)].color = e.target.value
+            renderPages()
         }
     })
     list.querySelectorAll(".manualPageLayout").forEach(el=>{
