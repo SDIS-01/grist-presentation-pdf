@@ -44,6 +44,12 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
     padding:7px 16px;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.25);
     line-height:1.3;text-align:center;
 }
+.page-header-plain{flex:0 0 auto;padding:14px 30px 6px 30px;border-bottom:1px solid #eee;}
+.header-title-overlay-plain{
+    color:var(--bleu-france);font-weight:700;font-size:15px;text-align:center;
+}
+.page-footer-image{flex:0 0 auto;line-height:0;}
+.page-footer-image img{width:100%;height:auto;display:block;}
 .page-body{padding:20px 30px;flex:1;overflow:hidden;}
 .page-footer{padding:8px 30px;border-top:1px solid #eee;font-size:10px;color:#888780;flex:0 0 auto;}
 
@@ -69,7 +75,7 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
 .badge-list{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;}
 .badge-item{background:#eef2f8;border-radius:6px;padding:7px 11px;font-size:12px;}
 .badge-item .k{color:#5f5e5a;}
-.badge-item .v{font-weight:700;color:var(--bleu-france);}
+.badge-item .v{font-weight:700;color:var(--bleu-france);white-space:pre-wrap;}
 
 .section-title{font-size:12px;font-weight:700;margin-bottom:6px;color:var(--bleu-france);}
 .comment-box{
@@ -90,10 +96,12 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
 
 table.actions-table{width:100%;border-collapse:collapse;font-size:11px;}
 table.actions-table th{padding:5px 4px;color:#5f5e5a;font-weight:700;text-align:left;border-bottom:1px solid #b9c6dc;}
-table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
+table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;white-space:pre-wrap;}
+.tasks-recap-table .action-row td{background:#f7f9fc;border-top:1px solid #b9c6dc;}
+.tasks-recap-table .task-row td{color:#5f5e5a;font-size:10.5px;}
 .pct-badge{padding:2px 10px;border-radius:8px;font-weight:700;display:inline-block;}
 
-.journal-entry{margin-bottom:9px;font-size:11.5px;line-height:1.7;}
+.journal-entry{margin-bottom:9px;font-size:11.5px;line-height:1.7;white-space:pre-wrap;}
 .budget-placeholder{font-size:11px;color:#b4b2a9;font-style:italic;}
 </style>
 </head>
@@ -121,12 +129,45 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
   <div id="manualPagesWarning" style="font-size:11px;color:#b35d15;"></div>
 </div>
 
+<div id="tasksBar" style="padding:10px 14px;background:#fff;border-bottom:1px solid #ddd;">
+  <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+    <input type="checkbox" id="includeTasksCheckbox">
+    Inclure les actions MEO avec leurs tâches
+  </label>
+  <div id="tasksConfigFields" style="display:none;margin-top:10px;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Table des tâches (nom exact dans Grist)</label>
+      <input type="text" id="tasksTableIdInput" placeholder="ex: Taches" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Colonne de référence vers l'action</label>
+      <input type="text" id="tasksRefColInput" placeholder="ex: Action" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Colonne Libellé de la tâche</label>
+      <input type="text" id="tasksLabelColInput" placeholder="ex: Libelle_Tache" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Colonne Commentaire de la tâche</label>
+      <input type="text" id="tasksCommentaireColInput" placeholder="ex: Commentaire" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Colonne Avancement de la tâche</label>
+      <input type="text" id="tasksAvancementColInput" placeholder="ex: Avancement" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div>
+      <label style="display:block;font-size:11px;color:#888;">Colonne Responsable de la tâche</label>
+      <input type="text" id="tasksResponsableColInput" placeholder="ex: Responsable" style="width:100%;box-sizing:border-box;padding:5px 7px;font-size:12px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+  </div>
+</div>
+
 <div id="pagesContainer"></div>
 
 
 <script>
 grist.ready({
-requiredAccess:'read table',
+requiredAccess:'full',
 columns:[
 {name:'idProjet',title:'ID_Projet_Action_AV'},
 {name:'idAction',title:'ID_Action_MEO'},
@@ -194,7 +235,7 @@ function displayValue(v){
     if(v===null || v===undefined) return ""
     if(Array.isArray(v)){
         let arr = v[0]==='L' ? v.slice(1) : v
-        return arr.map(displayValue).join(", ")
+        return arr.map(displayValue).join("\n")
     }
     if(typeof v === "object"){
         if('value' in v) return displayValue(v.value)
@@ -278,6 +319,129 @@ projectSelect.oninput = ()=>{
 }
 document.getElementById("extraCommentInput").oninput = renderPages
 
+// ===== Actions MEO avec leurs tâches (table séparée) =====
+let tasksConfig = {
+    tableId:"", refCol:"", labelCol:"Libelle_Tache", commentaireCol:"Commentaire",
+    avancementCol:"Avancement", responsableCol:"Responsable"
+}
+
+function fillTasksConfigInputs(){
+    document.getElementById("tasksTableIdInput").value = tasksConfig.tableId
+    document.getElementById("tasksRefColInput").value = tasksConfig.refCol
+    document.getElementById("tasksLabelColInput").value = tasksConfig.labelCol
+    document.getElementById("tasksCommentaireColInput").value = tasksConfig.commentaireCol
+    document.getElementById("tasksAvancementColInput").value = tasksConfig.avancementCol
+    document.getElementById("tasksResponsableColInput").value = tasksConfig.responsableCol
+}
+
+document.getElementById("includeTasksCheckbox").onchange = (e)=>{
+    document.getElementById("tasksConfigFields").style.display = e.target.checked ? "grid" : "none"
+    grist.setOption("includeTasks", e.target.checked)
+    renderPages()
+}
+
+;["tasksTableIdInput","tasksRefColInput","tasksLabelColInput","tasksCommentaireColInput","tasksAvancementColInput","tasksResponsableColInput"].forEach(id=>{
+    document.getElementById(id).oninput = ()=>{
+        tasksConfig = {
+            tableId: document.getElementById("tasksTableIdInput").value.trim(),
+            refCol: document.getElementById("tasksRefColInput").value.trim(),
+            labelCol: document.getElementById("tasksLabelColInput").value.trim() || "Libelle_Tache",
+            commentaireCol: document.getElementById("tasksCommentaireColInput").value.trim() || "Commentaire",
+            avancementCol: document.getElementById("tasksAvancementColInput").value.trim() || "Avancement",
+            responsableCol: document.getElementById("tasksResponsableColInput").value.trim() || "Responsable"
+        }
+        grist.setOption("tasksConfig", tasksConfig)
+        renderPages()
+    }
+})
+
+grist.onOptions((options)=>{
+    if(options && options.tasksConfig){
+        tasksConfig = Object.assign(tasksConfig, options.tasksConfig)
+        fillTasksConfigInputs()
+    }
+    if(options && options.includeTasks){
+        document.getElementById("includeTasksCheckbox").checked = true
+        document.getElementById("tasksConfigFields").style.display = "grid"
+    }
+})
+
+function refToRowId(ref){
+    // Une colonne Reference est generalement serialisee comme un entier (id de ligne),
+    // parfois enveloppee dans un tableau selon les cas.
+    if(typeof ref === "number") return ref
+    if(Array.isArray(ref)) return ref[ref.length-1]
+    return null
+}
+
+async function fetchTasksByActionId(){
+    if(!tasksConfig.tableId) return new Map()
+    try{
+        let table = await grist.docApi.fetchTable(tasksConfig.tableId)
+        let ids = table.id || []
+        let byAction = new Map()
+        for(let i=0;i<ids.length;i++){
+            let actionRowId = refToRowId(table[tasksConfig.refCol] ? table[tasksConfig.refCol][i] : null)
+            if(actionRowId === null) continue
+            let task = {
+                label: table[tasksConfig.labelCol] ? table[tasksConfig.labelCol][i] : "",
+                commentaire: table[tasksConfig.commentaireCol] ? table[tasksConfig.commentaireCol][i] : "",
+                avancement: table[tasksConfig.avancementCol] ? table[tasksConfig.avancementCol][i] : null,
+                responsable: table[tasksConfig.responsableCol] ? table[tasksConfig.responsableCol][i] : ""
+            }
+            if(!byAction.has(actionRowId)) byAction.set(actionRowId, [])
+            byAction.get(actionRowId).push(task)
+        }
+        return byAction
+    }catch(err){
+        console.error("Erreur lecture table des tâches:", err)
+        return null
+    }
+}
+
+function buildActionsTasksRecapHtml(actionRows, tasksByActionId, m){
+    if(actionRows.length === 0) return ""
+    let rows = actionRows.map(a=>{
+        let name = displayValue(a[m.idAction])
+        let avancement = getPercent(a[m.avancement])
+        let porteur = m.porteur ? displayValue(a[m.porteur]) : ""
+        let commentaire = m.commentaire ? displayValue(a[m.commentaire]) : ""
+        let interrompu = isInterrompu(a, m)
+        let colors = bandColors(avancement, interrompu)
+        let tasks = (tasksByActionId && tasksByActionId.get(a.id)) || []
+
+        let taskRows = tasks.map(t=>{
+            let tPct = getPercent(t.avancement)
+            let tColors = bandColors(tPct, false)
+            return `
+              <tr class="task-row">
+                <td style="padding-left:22px;">${escapeHtml(displayValue(t.label))}</td>
+                <td>${escapeHtml(displayValue(t.responsable))}</td>
+                <td>${tPct!==null ? `<span style="color:${tColors.text};font-weight:700;">${tPct}%</span>` : ""}</td>
+                <td>${escapeHtml(displayValue(t.commentaire))}</td>
+              </tr>`
+        }).join("")
+
+        return `
+          <tr class="action-row">
+            <td style="font-weight:700;">${escapeHtml(name)}</td>
+            <td>${escapeHtml(porteur)}</td>
+            <td>${avancement!==null ? `<span style="color:${colors.text};font-weight:700;">${avancement}%</span>` : ""}</td>
+            <td>${escapeHtml(commentaire)}</td>
+          </tr>
+          ${taskRows}`
+    }).join("")
+
+    return `
+      <div class="section-title" style="margin-top:18px;">Actions MEO et tâches</div>
+      <table class="actions-table tasks-recap-table">
+        <thead>
+          <tr><th>Action / Tâche</th><th>Responsable</th><th>Avancement</th><th>Commentaire</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`
+}
+
 // ===== Rendu des pages =====
 let manualPages = [] // {text:"", imageDataUrl:null}
 
@@ -294,7 +458,7 @@ function autoPageCountFor(mainBodyHtml, journalBodyHtml, title){
     return combinedHeight <= 794 ? 1 : 2
 }
 
-function renderPages(){
+async function renderPages(){
     let container = document.getElementById("pagesContainer")
     let m = currentMappings
     refreshProjectList()
@@ -316,7 +480,18 @@ function renderPages(){
 
     let title = projectRow ? displayValue(projectRow[m.idProjet]) : selectedIdFallback()
     let mainBodyHtml = buildMainBodyHtml(projectRow, actionRows, m)
-    let journalBodyHtml = buildJournalBodyHtml(projectRow, m)
+
+    let tasksRecapHtml = ""
+    if(document.getElementById("includeTasksCheckbox").checked){
+        let tasksByActionId = await fetchTasksByActionId()
+        if(tasksByActionId === null){
+            document.getElementById("status").textContent = "Erreur : impossible de lire la table des tâches (vérifiez la configuration ci-dessus)."
+        } else {
+            tasksRecapHtml = buildActionsTasksRecapHtml(actionRows, tasksByActionId, m)
+            document.getElementById("status").textContent = ""
+        }
+    }
+    let journalBodyHtml = tasksRecapHtml + buildJournalBodyHtml(projectRow, m)
 
     let autoPageCount = autoPageCountFor(mainBodyHtml, journalBodyHtml, title)
     let maxManualAllowed = Math.max(0, 4 - autoPageCount)
@@ -349,16 +524,55 @@ function updateAddPageState(autoPageCount){
 }
 
 function buildManualPageBodyHtml(page){
+    let layout = page.layout || "top"
+    let hasImage = !!page.imageDataUrl
+    let hasText = !!page.text
+
+    let imgHtml = hasImage ? `<img src="${page.imageDataUrl}" style="max-width:100%;max-height:100%;object-fit:contain;">` : ``
+    let textHtml = hasText
+        ? `<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">${escapeHtml(page.text)}</div>`
+        : (hasImage ? `` : `<div style="font-size:11px;color:#999;font-style:italic;">Page vierge — ajoutez du texte ou une image via les contrôles ci-dessus.</div>`)
+
+    if(!hasImage) return `<div style="padding-top:6px;">${textHtml}</div>`
+    if(!hasText) return `<div style="padding-top:6px;text-align:center;">${imgHtml}</div>`
+
+    if(layout === "bottom"){
+        return `
+          <div style="padding-top:6px;">
+            ${textHtml}
+            <div style="text-align:center;margin-top:16px;">${imgHtml}</div>
+          </div>`
+    }
+    if(layout === "left"){
+        return `
+          <div style="padding-top:6px;display:flex;gap:20px;align-items:flex-start;">
+            <div style="flex:0 0 45%;">${imgHtml}</div>
+            <div style="flex:1;">${textHtml}</div>
+          </div>`
+    }
+    if(layout === "right"){
+        return `
+          <div style="padding-top:6px;display:flex;gap:20px;align-items:flex-start;">
+            <div style="flex:1;">${textHtml}</div>
+            <div style="flex:0 0 45%;">${imgHtml}</div>
+          </div>`
+    }
+    // "top" par défaut
     return `
-        <div style="padding-top:6px;">
-          ${page.imageDataUrl ? `<div style="text-align:center;margin-bottom:16px;"><img src="${page.imageDataUrl}" style="max-width:100%;max-height:420px;object-fit:contain;"></div>` : ``}
-          ${page.text ? `<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">${escapeHtml(page.text)}</div>` : `<div style="font-size:11px;color:#999;font-style:italic;">Page vierge — ajoutez du texte ou une image via les contrôles ci-dessus.</div>`}
-        </div>
-    `
+      <div style="padding-top:6px;">
+        <div style="text-align:center;margin-bottom:16px;">${imgHtml}</div>
+        ${textHtml}
+      </div>`
 }
 
 function renderManualPagesControls(){
     let list = document.getElementById("manualPagesList")
+    let layoutLabels = {
+        top: "Image au-dessus du texte",
+        bottom: "Image en dessous du texte",
+        left: "Image à gauche, texte à droite",
+        right: "Image à droite, texte à gauche"
+    }
     list.innerHTML = manualPages.map((p, i) => `
         <div style="border:1px solid #eee;border-radius:6px;padding:10px;margin-bottom:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -366,7 +580,17 @@ function renderManualPagesControls(){
             <button type="button" class="removePageBtn" data-idx="${i}" style="font-size:11px;border:1px solid #ccc;background:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;">Supprimer</button>
           </div>
           <textarea class="manualPageText" data-idx="${i}" rows="3" style="width:100%;box-sizing:border-box;padding:6px 8px;font-size:12px;font-family:Tahoma,Geneva,sans-serif;border:1px solid #ccc;border-radius:4px;resize:vertical;" placeholder="Texte libre pour cette page…">${escapeHtml(p.text)}</textarea>
-          <input type="file" class="manualPageImage" data-idx="${i}" accept="image/*" style="margin-top:6px;font-size:12px;">
+          <div style="display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+            <input type="file" class="manualPageImage" data-idx="${i}" accept="image/*" style="font-size:12px;">
+            <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:6px;">
+              Disposition :
+              <select class="manualPageLayout" data-idx="${i}" style="font-size:12px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;">
+                ${Object.entries(layoutLabels).map(([val,label])=>
+                    `<option value="${val}" ${(p.layout||"top")===val ? "selected" : ""}>${label}</option>`
+                ).join("")}
+              </select>
+            </label>
+          </div>
         </div>
     `).join("")
 
@@ -389,6 +613,12 @@ function renderManualPagesControls(){
             reader.readAsDataURL(file)
         }
     })
+    list.querySelectorAll(".manualPageLayout").forEach(el=>{
+        el.onchange = (e)=>{
+            manualPages[Number(e.target.dataset.idx)].layout = e.target.value
+            renderPages()
+        }
+    })
     list.querySelectorAll(".removePageBtn").forEach(el=>{
         el.onclick = (e)=>{
             manualPages.splice(Number(e.target.dataset.idx), 1)
@@ -399,29 +629,37 @@ function renderManualPagesControls(){
 }
 
 document.getElementById("addPageBtn").onclick = ()=>{
-    manualPages.push({text:"", imageDataUrl:null})
+    manualPages.push({text:"", imageDataUrl:null, layout:"top"})
     renderManualPagesControls()
     renderPages()
 }
 
-function headerHtml(pageIndex){
-    let src = (pageIndex === 1) ? HEADER_IMAGE_BASE64 : SECONDARY_HEADER_IMAGE_BASE64
-    return `<img src="${src}" alt="SDIS de l'Ain">`
+function headerHtml(){
+    return `<img src="${HEADER_IMAGE_BASE64}" alt="SDIS de l'Ain">`
 }
 
 function buildPageShell(title, pageLabel, bodyHtml, autoHeight, pageIndex){
     let page = document.createElement("div")
     page.className = "pdf-page"
     if(autoHeight) page.style.height = "auto"
+
+    let headerSection = (pageIndex === 1)
+        ? `<div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>`
+        : `<div class="page-header-plain"><div class="header-title-overlay-plain">${escapeHtml(title)}</div></div>`
+
+    let footerSection = (pageIndex === 1)
+        ? `<div class="page-footer">${escapeHtml(footerWithDate())}</div>`
+        : `<div class="page-footer-image"><img src="${SECONDARY_HEADER_IMAGE_BASE64}" alt="SDIS de l'Ain"></div>`
+
     page.innerHTML = `
-      <div class="page-header">${headerHtml(pageIndex)}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
+      ${headerSection}
       <div class="page-body">
         <div class="proj-title-row" style="justify-content:flex-end;">
           <div class="page-num">${pageLabel}</div>
         </div>
         ${bodyHtml}
       </div>
-      <div class="page-footer">${escapeHtml(footerWithDate())}</div>
+      ${footerSection}
     `
     return page
 }
