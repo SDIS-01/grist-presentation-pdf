@@ -949,7 +949,7 @@ function buildMainBodyHtml(projectRow, actionRows, m){
               ${groupement ? `<div class="badge-item"><span class="k">Groupement</span> <span class="v">${escapeHtml(groupement)}</span></div>` : ``}
               ${porteur ? `<div class="badge-item"><span class="k">Porteur</span> <span class="v">${escapeHtml(porteur)}</span></div>` : ``}
               ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="pct-badge" style="background:${priorityBadgeStyle(priorite).bg};color:${priorityBadgeStyle(priorite).color};">${escapeHtml(priorite)}</span></div>` : ``}
-              ${rattachements.map(r=>`<div class="badge-item"><span class="k">${escapeHtml(r.label)}</span> <span class="v" style="color:#e05252;">${escapeHtml(r.text || "Oui")}</span></div>`).join("")}
+              ${rattachements.map(r=>`<div class="badge-item"><span class="k" style="font-weight:700;color:#333;">${escapeHtml(r.label)}</span> <span class="v">${escapeHtml(r.text || "Oui")}</span></div>`).join("")}
             </div>
             ${commentaire ? `<div class="section-title">Commentaire</div><div class="comment-box">${escapeHtml(commentaire)}</div>` : ``}
             ${passageInstance ? `<div class="section-title">Passages en instance</div><div class="instance-box">${escapeHtml(passageInstance)}</div>` : ``}
