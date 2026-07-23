@@ -36,8 +36,14 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
     width:1123px;height:794px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);
     color:#1a1a1a;display:flex;flex-direction:column;overflow:hidden;flex:0 0 auto;
 }
-.page-header{display:block;padding:0;flex:0 0 auto;overflow:hidden;line-height:0;}
-.page-header img{width:100%;height:90px;object-fit:cover;display:block;}
+.page-header{display:block;padding:0;flex:0 0 auto;overflow:visible;line-height:0;position:relative;}
+.page-header img{width:100%;height:auto;display:block;}
+.header-title-overlay{
+    position:absolute;left:230px;right:16px;top:50%;transform:translateY(-50%);
+    background:#fff;color:#C0504D;font-weight:700;font-size:15px;
+    padding:7px 16px;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.25);
+    line-height:1.3;
+}
 .page-body{padding:20px 30px;flex:1;overflow:hidden;}
 .page-footer{padding:8px 30px;border-top:1px solid #eee;font-size:10px;color:#888780;flex:0 0 auto;}
 
@@ -97,7 +103,7 @@ table.actions-table td{padding:5px 4px;border-bottom:1px solid #eef2f8;}
   <input type="text" id="projectSelect" list="projectOptions" placeholder="Choisir un projet… (tapez pour rechercher)" autocomplete="off" style="min-height:34px;padding:4px 8px;font-size:13px;flex:1 1 320px;max-width:520px;border:1px solid #ccc;border-radius:4px;">
   <datalist id="projectOptions"></datalist>
   <button id="generateBtn">Télécharger le PDF</button>
-  <button id="resetBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;">↺ Réinitialiser</button>
+  <button id="resetBtn" type="button" style="min-height:34px;padding:6px 14px;font-size:12px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;white-space:nowrap;flex:0 0 auto;color:#333;">Réinitialiser</button>
   <span id="status"></span>
 </div>
 
@@ -304,10 +310,9 @@ function buildPage1(projectRow, actionRows, m){
     let donutColors = {fill:"var(--green)", pale:"var(--green-pale)", text:"var(--green-text)"}
 
     page.innerHTML = `
-      <div class="page-header">${headerHtml()}</div>
+      <div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
       <div class="page-body">
-        <div class="proj-title-row">
-          <div class="proj-title">${escapeHtml(title)}</div>
+        <div class="proj-title-row" style="justify-content:flex-end;">
           <div class="page-num">Page 1/2</div>
         </div>
         <div class="body-flex">
@@ -348,10 +353,9 @@ function buildPage2(projectRow, m){
     let extraComment = document.getElementById("extraCommentInput").value.trim()
 
     page.innerHTML = `
-      <div class="page-header">${headerHtml()}</div>
+      <div class="page-header">${headerHtml()}<div class="header-title-overlay">${escapeHtml(title)}</div></div>
       <div class="page-body">
-        <div class="proj-title-row">
-          <div class="proj-title">${escapeHtml(title)}</div>
+        <div class="proj-title-row" style="justify-content:flex-end;">
           <div class="page-num">Page 2/2</div>
         </div>
         <div class="section-title">Journal de bord</div>
