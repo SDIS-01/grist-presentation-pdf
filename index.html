@@ -673,20 +673,39 @@ function measureHtmlHeight(html, title, pageIndex){
     return height
 }
 
-function packAuxPages(entries, title){
+function packContentPages(mainBodyHtml, auxEntries, title){
     let pages = []
-    let current = []
-    for(let i=0;i<entries.length;i++){
-        let candidate = current.concat([entries[i]])
-        let height = measureHtmlHeight(renderAuxPageHtml(candidate), title, 2)
-        if(height > 794 && current.length > 0){
-            pages.push(renderAuxPageHtml(current))
-            current = [entries[i]]
+    let currentAux = []
+    let pageIsFirst = true
+
+    function htmlFor(isFirst, auxList){
+        let auxHtml = renderAuxPageHtml(auxList)
+        return isFirst ? (mainBodyHtml + auxHtml) : auxHtml
+    }
+
+    for(let i=0;i<auxEntries.length;i++){
+        let candidateAux = currentAux.concat([auxEntries[i]])
+        let height = measureHtmlHeight(htmlFor(pageIsFirst, candidateAux), title, pageIsFirst ? 1 : 2)
+        if(height > 794 && currentAux.length > 0){
+            pages.push({isFirst: pageIsFirst, html: htmlFor(pageIsFirst, currentAux)})
+            pageIsFirst = false
+            currentAux = [auxEntries[i]]
+        } else if(height > 794 && currentAux.length === 0 && pageIsFirst){
+            // Même vide, l'ajout de cette première entrée fait déjà déborder la page 1 :
+            // la page 1 reste seule avec le contenu principal, l'entrée démarre la page suivante.
+            pages.push({isFirst: true, html: mainBodyHtml})
+            pageIsFirst = false
+            currentAux = [auxEntries[i]]
         } else {
-            current = candidate
+            currentAux = candidateAux
         }
     }
-    if(current.length > 0) pages.push(renderAuxPageHtml(current))
+
+    if(pageIsFirst){
+        pages.push({isFirst: true, html: htmlFor(true, currentAux)})
+    } else {
+        pages.push({isFirst: false, html: htmlFor(false, currentAux)})
+    }
     return pages
 }
 
@@ -766,7 +785,10 @@ function updateSaveDeleteButtons(){
     deleteBtn.style.display = hasSavedPagesForProject(currentProjectIdForPages) ? "inline-block" : "none"
 }
 
+let renderGeneration = 0
+
 async function renderPages(){
+    let myGeneration = ++renderGeneration
     let container = document.getElementById("pagesContainer")
     let m = currentMappings
     refreshProjectList()
@@ -802,6 +824,9 @@ async function renderPages(){
     let tasksByActionId = null
     if(document.getElementById("includeTasksCheckbox").checked){
         tasksByActionId = await fetchTasksByActionId()
+        // Une exécution plus récente de renderPages() a déjà pris le relais : on abandonne celle-ci
+        // pour ne jamais écraser un rendu à jour avec des données obsolètes.
+        if(myGeneration !== renderGeneration) return
         if(tasksByActionId === null){
             document.getElementById("status").textContent = "Erreur : impossible de lire la table des tâches (vérifiez la configuration ci-dessus)."
         } else {
@@ -812,38 +837,25 @@ async function renderPages(){
     let selectedActionRows = actionRows.filter(a => selectedTaskActionIds.has(a.id))
     let auxEntries = buildAtomicAuxEntries(projectRow, actionRows, selectedActionRows, tasksByActionId, m)
 
-    // Essaie d'abord de tout faire tenir avec la page 1 (une seule page au total)
-    let mergedHeight = measureHtmlHeight(mainBodyHtml + renderAuxPageHtml(auxEntries), title, 1)
-    let autoPageCount, auxPages, contentTruncated
-    if(mergedHeight <= 794){
-        autoPageCount = 1
-        auxPages = []
-        contentTruncated = false
-    } else {
-        auxPages = packAuxPages(auxEntries, title)
-        autoPageCount = 1 + auxPages.length
-        contentTruncated = false
-        if(autoPageCount > 4){
-            auxPages = auxPages.slice(0, 3)
-            autoPageCount = 1 + auxPages.length
-            contentTruncated = true
-        }
+    let contentPages = packContentPages(mainBodyHtml, auxEntries, title)
+    let contentTruncated = false
+    if(contentPages.length > 4){
+        contentPages = contentPages.slice(0, 4)
+        contentTruncated = true
     }
+    let autoPageCount = contentPages.length
+
+    if(myGeneration !== renderGeneration) return
 
     let maxManualAllowed = Math.max(0, 4 - autoPageCount)
     let manualToRender = manualPages.slice(0, maxManualAllowed)
     let totalPages = autoPageCount + manualToRender.length
 
     container.innerHTML = ""
-    if(autoPageCount === 1){
-        container.appendChild(buildPageShell(title, `Page 1/${totalPages}`, mainBodyHtml + renderAuxPageHtml(auxEntries), false, 1))
-    } else {
-        container.appendChild(buildPageShell(title, `Page 1/${totalPages}`, mainBodyHtml, false, 1))
-        auxPages.forEach((auxHtml, i)=>{
-            let pageIndex = 2+i
-            container.appendChild(buildPageShell(title, `Page ${pageIndex}/${totalPages}`, auxHtml, false, pageIndex))
-        })
-    }
+    contentPages.forEach((page, i)=>{
+        let pageIndex = i+1
+        container.appendChild(buildPageShell(title, `Page ${pageIndex}/${totalPages}`, page.html, false, pageIndex))
+    })
     manualToRender.forEach((p, i)=>{
         let pageIndex = autoPageCount+i+1
         let label = `Page ${pageIndex}/${totalPages}`
