@@ -226,6 +226,8 @@ document.getElementById("resetBtn").onclick = ()=>{
     document.getElementById("extraCommentInput").value = ""
     document.getElementById("status").textContent = ""
     manualPages = []
+    selectedTaskActionIds = new Set()
+    taskActionIdsSeen = new Set()
     renderManualPagesControls()
     renderPages()
 }
@@ -924,8 +926,8 @@ function buildMainBodyHtml(projectRow, actionRows, m){
     let rattachements = [
         {flag: m.projetEtablissement, label: "Projet établissement 2023-2028"},
         {flag: m.sdacr, label: "SDACR 2025-2030"},
-        {flag: m.mec2023, label: "MEC 2023"},
-        {flag: m.duerp, label: "DUERP"},
+        {flag: m.mec2023, label: "MEC 2023", redTitle: true},
+        {flag: m.duerp, label: "DUERP", redTitle: true},
         {flag: m.vissct, label: "VISSCT"}
     ].map(r=>{
         if(!r.flag || !projectRow) return null
@@ -933,7 +935,7 @@ function buildMainBodyHtml(projectRow, actionRows, m){
         if(!isFlagTrue(raw)) return null
         let text = dedupedMultiValue(raw)
         let isBooleanish = (raw === true || text.toLowerCase() === "true" || text === "1")
-        return {label: r.label, text: isBooleanish ? "" : text}
+        return {label: r.label, text: isBooleanish ? "" : text, redTitle: !!r.redTitle}
     }).filter(r => r !== null)
 
     return `
@@ -949,7 +951,7 @@ function buildMainBodyHtml(projectRow, actionRows, m){
               ${groupement ? `<div class="badge-item"><span class="k">Groupement</span> <span class="v">${escapeHtml(groupement)}</span></div>` : ``}
               ${porteur ? `<div class="badge-item"><span class="k">Porteur</span> <span class="v">${escapeHtml(porteur)}</span></div>` : ``}
               ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="pct-badge" style="background:${priorityBadgeStyle(priorite).bg};color:${priorityBadgeStyle(priorite).color};">${escapeHtml(priorite)}</span></div>` : ``}
-              ${rattachements.map(r=>`<div class="badge-item"><span class="k" style="font-weight:700;color:#333;">${escapeHtml(r.label)}</span> <span class="v">${escapeHtml(r.text || "Oui")}</span></div>`).join("")}
+              ${rattachements.map(r=>`<div class="badge-item"><span class="k" style="font-weight:700;color:${r.redTitle ? "var(--red)" : "#333"};">${escapeHtml(r.label)}</span> <span class="k" style="white-space:pre-wrap;">${escapeHtml(r.text || "Oui")}</span></div>`).join("")}
             </div>
             ${commentaire ? `<div class="section-title">Commentaire</div><div class="comment-box">${escapeHtml(commentaire)}</div>` : ``}
             ${passageInstance ? `<div class="section-title">Passages en instance</div><div class="instance-box">${escapeHtml(passageInstance)}</div>` : ``}
