@@ -37,7 +37,7 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
     color:#1a1a1a;display:flex;flex-direction:column;overflow:hidden;flex:0 0 auto;
 }
 .page-header{display:block;padding:0;flex:0 0 auto;overflow:visible;line-height:0;position:relative;}
-.page-header img{width:100%;height:auto;display:block;}
+.page-header img{width:100%;height:122.93px;display:block;object-fit:cover;}
 .header-title-overlay{
     position:absolute;left:230px;right:16px;top:50%;transform:translateY(-50%);
     background:#fff;color:var(--bleu-france);font-weight:700;font-size:15px;
@@ -49,7 +49,7 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
     color:var(--bleu-france);font-weight:700;font-size:15px;text-align:center;
 }
 .page-footer-image{flex:0 0 auto;line-height:0;}
-.page-footer-image img{width:100%;height:auto;display:block;}
+.page-footer-image img{width:100%;height:119.64px;display:block;object-fit:cover;}
 .page-body{padding:20px 30px;flex:1;overflow:hidden;}
 .page-footer{padding:8px 30px;border-top:1px solid #eee;font-size:10px;color:#888780;flex:0 0 auto;}
 
@@ -539,7 +539,10 @@ function refToRowId(ref){
 async function fetchTasksByActionId(){
     if(!tasksConfig.tableId) return new Map()
     try{
-        let table = await grist.docApi.fetchTable(tasksConfig.tableId)
+        let table = await Promise.race([
+            grist.docApi.fetchTable(tasksConfig.tableId),
+            new Promise((_, reject)=> setTimeout(()=>reject(new Error("Délai dépassé lors de la lecture de la table des tâches")), 10000))
+        ])
         let ids = table.id || []
         let byAction = new Map()
         for(let i=0;i<ids.length;i++){
@@ -674,37 +677,80 @@ function measureHtmlHeight(html, title, pageIndex){
 }
 
 function packContentPages(mainBodyHtml, auxEntries, title){
-    let pages = []
-    let currentAux = []
-    let pageIsFirst = true
-
     function htmlFor(isFirst, auxList){
         let auxHtml = renderAuxPageHtml(auxList)
         return isFirst ? (mainBodyHtml + auxHtml) : auxHtml
     }
+    function measure(isFirst, auxList){
+        return measureHtmlHeight(htmlFor(isFirst, auxList), title, isFirst ? 1 : 2)
+    }
 
-    for(let i=0;i<auxEntries.length;i++){
-        let candidateAux = currentAux.concat([auxEntries[i]])
-        let height = measureHtmlHeight(htmlFor(pageIsFirst, candidateAux), title, pageIsFirst ? 1 : 2)
-        if(height > 794 && currentAux.length > 0){
-            pages.push({isFirst: pageIsFirst, html: htmlFor(pageIsFirst, currentAux)})
-            pageIsFirst = false
-            currentAux = [auxEntries[i]]
-        } else if(height > 794 && currentAux.length === 0 && pageIsFirst){
-            // Même vide, l'ajout de cette première entrée fait déjà déborder la page 1 :
-            // la page 1 reste seule avec le contenu principal, l'entrée démarre la page suivante.
-            pages.push({isFirst: true, html: mainBodyHtml})
-            pageIsFirst = false
-            currentAux = [auxEntries[i]]
-        } else {
-            currentAux = candidateAux
+    let pages = []
+    let state = {currentAux: [], pageIsFirst: true}
+
+    function closePage(){
+        pages.push({isFirst: state.pageIsFirst, html: htmlFor(state.pageIsFirst, state.currentAux)})
+        state.pageIsFirst = false
+        state.currentAux = []
+    }
+
+    // Ajoute des entrées au fil de l'eau, une par une, en démarrant une nouvelle page dès que ça déborde.
+    function appendFlow(entries){
+        for(let entry of entries){
+            let candidate = state.currentAux.concat([entry])
+            let height = measure(state.pageIsFirst, candidate)
+            if(height > 794 && state.currentAux.length > 0){
+                closePage()
+                state.currentAux = [entry]
+            } else if(height > 794 && state.currentAux.length === 0 && state.pageIsFirst){
+                pages.push({isFirst: true, html: mainBodyHtml})
+                state.pageIsFirst = false
+                state.currentAux = [entry]
+            } else {
+                state.currentAux = candidate
+            }
         }
     }
 
-    if(pageIsFirst){
-        pages.push({isFirst: true, html: htmlFor(true, currentAux)})
+    // Ajoute un bloc qui doit rester entier si possible : tient-il en entier sur la page courante ?
+    // Sinon, page suivante entière ; sinon seulement, découpe entrée par entrée (jamais au milieu
+    // d'une action, puisque chaque entrée représente une action complète avec ses tâches).
+    function appendAtomicBlock(entries){
+        if(entries.length === 0) return
+        let withBlock = state.currentAux.concat(entries)
+        if(measure(state.pageIsFirst, withBlock) <= 794){
+            state.currentAux = withBlock
+            return
+        }
+        if(state.currentAux.length > 0){
+            closePage()
+        } else if(state.pageIsFirst){
+            pages.push({isFirst: true, html: mainBodyHtml})
+            state.pageIsFirst = false
+        }
+        if(measure(state.pageIsFirst, entries) <= 794){
+            state.currentAux = entries
+        } else {
+            appendFlow(entries)
+        }
+    }
+
+    let kinds = auxEntries.map(e=>e.kind)
+    let firstTasksIdx = kinds.indexOf('tasksRow')
+    let lastTasksIdx = kinds.lastIndexOf('tasksRow')
+
+    if(firstTasksIdx === -1){
+        appendFlow(auxEntries)
     } else {
-        pages.push({isFirst: false, html: htmlFor(false, currentAux)})
+        appendFlow(auxEntries.slice(0, firstTasksIdx))
+        appendAtomicBlock(auxEntries.slice(firstTasksIdx, lastTasksIdx+1))
+        appendFlow(auxEntries.slice(lastTasksIdx+1))
+    }
+
+    if(state.pageIsFirst){
+        pages.push({isFirst: true, html: htmlFor(true, state.currentAux)})
+    } else {
+        pages.push({isFirst: false, html: htmlFor(false, state.currentAux)})
     }
     return pages
 }
@@ -823,6 +869,7 @@ async function renderPages(){
 
     let tasksByActionId = null
     if(document.getElementById("includeTasksCheckbox").checked){
+        document.getElementById("status").textContent = "Chargement des tâches…"
         tasksByActionId = await fetchTasksByActionId()
         // Une exécution plus récente de renderPages() a déjà pris le relais : on abandonne celle-ci
         // pour ne jamais écraser un rendu à jour avec des données obsolètes.
@@ -830,43 +877,49 @@ async function renderPages(){
         if(tasksByActionId === null){
             document.getElementById("status").textContent = "Erreur : impossible de lire la table des tâches (vérifiez la configuration ci-dessus)."
         } else {
-            document.getElementById("status").textContent = ""
+            document.getElementById("status").textContent = "Mise en page…"
         }
     }
 
-    let selectedActionRows = actionRows.filter(a => selectedTaskActionIds.has(a.id))
-    let auxEntries = buildAtomicAuxEntries(projectRow, actionRows, selectedActionRows, tasksByActionId, m)
+    try{
+        let selectedActionRows = actionRows.filter(a => selectedTaskActionIds.has(a.id))
+        let auxEntries = buildAtomicAuxEntries(projectRow, actionRows, selectedActionRows, tasksByActionId, m)
 
-    let contentPages = packContentPages(mainBodyHtml, auxEntries, title)
-    let contentTruncated = false
-    if(contentPages.length > 4){
-        contentPages = contentPages.slice(0, 4)
-        contentTruncated = true
+        let contentPages = packContentPages(mainBodyHtml, auxEntries, title)
+        let contentTruncated = false
+        if(contentPages.length > 4){
+            contentPages = contentPages.slice(0, 4)
+            contentTruncated = true
+        }
+        let autoPageCount = contentPages.length
+
+        if(myGeneration !== renderGeneration) return
+
+        let maxManualAllowed = Math.max(0, 4 - autoPageCount)
+        let manualToRender = manualPages.slice(0, maxManualAllowed)
+        let totalPages = autoPageCount + manualToRender.length
+
+        container.innerHTML = ""
+        contentPages.forEach((page, i)=>{
+            let pageIndex = i+1
+            container.appendChild(buildPageShell(title, `Page ${pageIndex}/${totalPages}`, page.html, false, pageIndex))
+        })
+        manualToRender.forEach((p, i)=>{
+            let pageIndex = autoPageCount+i+1
+            let label = `Page ${pageIndex}/${totalPages}`
+            container.appendChild(buildPageShell(title, label, buildManualPageBodyHtml(p), false, pageIndex))
+        })
+
+        let manualTruncated = manualPages.length > maxManualAllowed
+        document.getElementById("manualPagesWarning").textContent = contentTruncated
+            ? "Le contenu dépasse la limite de 4 pages : une partie n'est pas incluse dans le PDF."
+            : (manualTruncated ? "Limite de 4 pages atteinte : certaines pages additionnelles ne sont pas incluses dans le PDF." : "")
+        updateAddPageState(autoPageCount)
+        if(document.getElementById("status").textContent === "Mise en page…") document.getElementById("status").textContent = ""
+    }catch(err){
+        console.error("Erreur lors de la construction des pages:", err)
+        document.getElementById("status").textContent = "Erreur lors de la mise en page. Essayez de décocher/recocher, ou vérifiez la console (F12)."
     }
-    let autoPageCount = contentPages.length
-
-    if(myGeneration !== renderGeneration) return
-
-    let maxManualAllowed = Math.max(0, 4 - autoPageCount)
-    let manualToRender = manualPages.slice(0, maxManualAllowed)
-    let totalPages = autoPageCount + manualToRender.length
-
-    container.innerHTML = ""
-    contentPages.forEach((page, i)=>{
-        let pageIndex = i+1
-        container.appendChild(buildPageShell(title, `Page ${pageIndex}/${totalPages}`, page.html, false, pageIndex))
-    })
-    manualToRender.forEach((p, i)=>{
-        let pageIndex = autoPageCount+i+1
-        let label = `Page ${pageIndex}/${totalPages}`
-        container.appendChild(buildPageShell(title, label, buildManualPageBodyHtml(p), false, pageIndex))
-    })
-
-    let manualTruncated = manualPages.length > maxManualAllowed
-    document.getElementById("manualPagesWarning").textContent = contentTruncated
-        ? "Le contenu dépasse la limite de 4 pages : une partie n'est pas incluse dans le PDF."
-        : (manualTruncated ? "Limite de 4 pages atteinte : certaines pages additionnelles ne sont pas incluses dans le PDF." : "")
-    updateAddPageState(autoPageCount)
 }
 
 function updateAddPageState(autoPageCount){
@@ -1268,10 +1321,19 @@ document.getElementById("generateBtn").onclick = async ()=>{
     btn.disabled = false
 }
 
+let renderDebounceTimer = null
+function scheduleRenderPages(){
+    if(renderDebounceTimer) clearTimeout(renderDebounceTimer)
+    renderDebounceTimer = setTimeout(()=>{
+        renderDebounceTimer = null
+        renderPages()
+    }, 200)
+}
+
 grist.onRecords((records, mappings)=>{
     currentRecords = records
     currentMappings = mappings
-    renderPages()
+    scheduleRenderPages()
 })
 </script>
 </body>
