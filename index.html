@@ -73,6 +73,8 @@ body{font-family:Tahoma,Geneva,sans-serif;margin:0;background:#f4f4f4;}
 .donut-label{font-size:12px;color:#5f5e5a;}
 
 .badge-list{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;}
+.tags-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
+.tag-chip{background:var(--bleu-france);color:#fff;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:12px;}
 .badge-item{background:#eef2f8;border-radius:6px;padding:7px 11px;font-size:12px;}
 .badge-item .k{color:#5f5e5a;}
 .badge-item .v{font-weight:700;color:var(--bleu-france);white-space:pre-wrap;}
@@ -194,9 +196,15 @@ columns:[
 {name:'porteur',title:'Porteur', optional:true},
 {name:'priorite',title:'Priorité', optional:true},
 {name:'commentaire',title:'Commentaire', optional:true},
+{name:'descriptif',title:'Descriptif', optional:true},
 {name:'journalBord',title:'Journal_bord', optional:true},
 {name:'groupement',title:'Groupement', optional:true},
-{name:'passageInstance',title:'Passage_Instance_Concatener', optional:true}
+{name:'passageInstance',title:'Passage_Instance_Concatener', optional:true},
+{name:'projetEtablissement',title:'Projet établissement 2023-2028', optional:true},
+{name:'sdacr',title:'SDACR 2025-2030', optional:true},
+{name:'mec2023',title:'MEC 2023', optional:true},
+{name:'duerp',title:'DUERP', optional:true},
+{name:'vissct',title:'VISSCT', optional:true}
 ]
 })
 
@@ -264,6 +272,14 @@ function getPercent(v){
     if(isNaN(n)) return 0
     if(n<=1) n = n*100
     return Math.max(0, Math.min(100, Math.round(n)))
+}
+
+function isFlagTrue(v){
+    if(v===true) return true
+    if(v===false || v===null || v===undefined) return false
+    let s = displayValue(v).trim().toLowerCase()
+    if(s === "" || s === "0" || s === "false" || s === "non" || s === "no") return false
+    return true
 }
 
 function isInterrompu(r, m){
@@ -507,7 +523,7 @@ async function renderPages(){
             document.getElementById("status").textContent = ""
         }
     }
-    let journalBodyHtml = tasksRecapHtml + buildJournalBodyHtml(projectRow, m)
+    let journalBodyHtml = buildJournalBodyHtml(projectRow, m) + tasksRecapHtml + buildActionsJournalBodyHtml(actionRows, m)
 
     let autoPageCount = autoPageCountFor(mainBodyHtml, journalBodyHtml, title)
     let maxManualAllowed = Math.max(0, 4 - autoPageCount)
@@ -747,9 +763,18 @@ function buildMainBodyHtml(projectRow, actionRows, m){
     let porteur = projectRow ? displayValue(projectRow[m.porteur]) : ""
     let priorite = projectRow ? displayValue(projectRow[m.priorite]) : ""
     let commentaire = projectRow ? displayValue(projectRow[m.commentaire]) : ""
+    let descriptif = projectRow ? displayValue(projectRow[m.descriptif]) : ""
     let passageInstance = projectRow ? displayValue(projectRow[m.passageInstance]) : ""
     let avancementGlobal = projectRow ? getPercent(projectRow[m.avancement]) : 0
     let donutColors = {fill:"var(--green)", pale:"var(--green-pale)", text:"var(--green-text)"}
+
+    let rattachements = [
+        {flag: m.projetEtablissement, label: "Projet établissement 2023-2028"},
+        {flag: m.sdacr, label: "SDACR 2025-2030"},
+        {flag: m.mec2023, label: "MEC 2023"},
+        {flag: m.duerp, label: "DUERP"},
+        {flag: m.vissct, label: "VISSCT"}
+    ].filter(r => r.flag && isFlagTrue(projectRow ? projectRow[r.flag] : null))
 
     return `
         <div class="body-flex">
@@ -765,6 +790,11 @@ function buildMainBodyHtml(projectRow, actionRows, m){
               ${porteur ? `<div class="badge-item"><span class="k">Porteur</span> <span class="v">${escapeHtml(porteur)}</span></div>` : ``}
               ${priorite ? `<div class="badge-item"><span class="k">Priorité</span> <span class="v" style="color:${priorityColor(priorite)};">${escapeHtml(priorite)}</span></div>` : ``}
             </div>
+            ${rattachements.length > 0 ? `
+              <div class="tags-row">
+                ${rattachements.map(r=>`<span class="tag-chip">${escapeHtml(r.label)}</span>`).join("")}
+              </div>` : ``}
+            ${descriptif ? `<div class="section-title">Descriptif</div><div class="comment-box">${escapeHtml(descriptif)}</div>` : ``}
             ${commentaire ? `<div class="section-title">Commentaire</div><div class="comment-box">${escapeHtml(commentaire)}</div>` : ``}
             ${passageInstance ? `<div class="section-title">Passages en instance</div><div class="instance-box">${escapeHtml(passageInstance)}</div>` : ``}
           </div>
@@ -786,6 +816,28 @@ function buildJournalBodyHtml(projectRow, m){
         <div class="section-title" style="margin-top:18px;">Journal de bord</div>
         ${journal ? journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("") : `<div style="font-size:11px;color:#999;">Aucune entrée</div>`}
         ${extraComment ? `<div class="section-title" style="margin-top:18px;">Commentaire additionnel</div><div class="comment-box">${escapeHtml(extraComment)}</div>` : ``}
+    `
+}
+
+function buildActionsJournalBodyHtml(actionRows, m){
+    let actionsWithJournal = actionRows
+        .map(a => ({a, journal: m.journalBord ? displayValue(a[m.journalBord]) : ""}))
+        .filter(x => x.journal.trim() !== "")
+
+    if(actionsWithJournal.length === 0) return ""
+
+    let sections = actionsWithJournal.map(({a, journal})=>{
+        let name = displayValue(a[m.idAction])
+        return `
+          <div style="margin-top:10px;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--bleu-france);margin-bottom:4px;">${escapeHtml(name)}</div>
+            ${journal.split("\n").filter(l=>l.trim()!=="").map(l=>`<div class="journal-entry">${escapeHtml(l)}</div>`).join("")}
+          </div>`
+    }).join("")
+
+    return `
+        <div class="section-title" style="margin-top:18px;">Journal de bord des actions</div>
+        ${sections}
     `
 }
 
